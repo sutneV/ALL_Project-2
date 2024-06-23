@@ -13,7 +13,8 @@ from datetime import datetime
 import random
 from PIL import Image
 from winotify import Notification, audio
-import matplotlib.pyplot as expense_summary
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ttkthemes import ThemedStyle
 from distinctipy import distinctipy
 
@@ -22,6 +23,7 @@ app.geometry("1280x720")
 app.resizable(False, False)
 app.title("IMS")
 customtkinter.set_default_color_theme("dark-blue")
+customtkinter.set_appearance_mode("Light")
 
 
 def login_page():
@@ -180,10 +182,113 @@ def login_page():
 
 
 def admin_dashboard(username):
+
+    def fetch_to_be_packed_data():
+        total_to_be_packed = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Packed",))
+        to_be_packed_data = cursor.fetchone()[0]
+        total_to_be_packed += to_be_packed_data
+        conn.commit()
+        conn.close()
+        return total_to_be_packed
+
+    def update_to_be_packed_label():
+        new_count = fetch_to_be_packed_data()
+        total_to_be_packed_label_1.configure(text=str(new_count))
+
+    def fetch_to_be_shipped_data():
+        total_to_be_shipped = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Shipped",))
+        to_be_shipped_data = cursor.fetchone()[0]
+        total_to_be_shipped += to_be_shipped_data
+        conn.commit()
+        conn.close()
+        return total_to_be_shipped
+
+    def update_to_be_shipped_label():
+        new_count = fetch_to_be_shipped_data()
+        total_to_be_shipped_label_1.configure(text=str(new_count))
+
+    def fetch_to_be_delivered_data():
+        total_to_be_delivered = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Delivered",))
+        to_be_delivered_data = cursor.fetchone()[0]
+        total_to_be_delivered += to_be_delivered_data
+        conn.commit()
+        conn.close()
+        return total_to_be_delivered
+
+    def update_to_be_delivered_label():
+        new_count = fetch_to_be_delivered_data()
+        total_to_be_delivered_label_1.configure(text=str(new_count))
+
+    def fetch_total_quantity_in_hand_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(PRODUCT_QUANTITY) FROM PRODUCT")
+        total_quantity_in_hand = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_quantity_in_hand
+
+    def update_total_quantity_in_hand_label():
+        new_count = fetch_total_quantity_in_hand_data()
+        total_quantity_in_hand_1.configure(text=str(new_count))
+
+    def fetch_total_quantity_to_be_received_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?", ("To be Received",))
+        total_quantity_to_be_received = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_quantity_to_be_received
+
+    def update_total_quantity_to_be_received_label():
+        new_count = fetch_total_quantity_to_be_received_data()
+        total_quantity_to_be_received_1.configure(text=str(new_count))
+
+    def fetch_low_stock_item_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT WHERE PRODUCT_QUANTITY < PRODUCT_MIN_STOCK")
+        low_stock_items = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return low_stock_items
+
+    def update_low_stock_item_label():
+        new_count = fetch_low_stock_item_data()
+        low_stock_items_1.configure(text=str(new_count))
+
+    def fetch_total_items_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT")
+        total_items = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_items
+
+    def update_total_items_label():
+        new_count = fetch_total_items_data()
+        all_items_1.configure(text=str(new_count))
     def register():
         name = reg_user.get()
         code = reg_password.get()
         level = reg_accesslevel.get()
+        if level == "Admin":
+            level = 0
+        elif level == "Supervisor":
+            level = 1
+        elif level == "Warehouse Worker":
+            level = 2
         bytes = code.encode("utf-8")
         salt = bcrypt.gensalt()
         hashed_password = bcrypt.hashpw(bytes, salt)
@@ -243,7 +348,6 @@ def admin_dashboard(username):
 
         change_pw_window = customtkinter.CTk()
         change_pw_window.title("Change Password")
-        change_pw_window.geometry("450x250")
 
         def fetch_selected_user_details():
             conn = sqlite3.connect("Inventory Management System.db")
@@ -317,7 +421,7 @@ def admin_dashboard(username):
         )
         change_pw_btn = customtkinter.CTkButton(
             master=change_pw_window,
-            text="Restock",
+            text="Change Password",
             command=change_password,
             font=customtkinter.CTkFont("SF Pro Display", size=13),
             corner_radius=200,
@@ -325,16 +429,12 @@ def admin_dashboard(username):
             text_color="black",
         )
 
-        change_pw_title.grid(
-            row=0, column=0, columnspan=2, sticky=W, padx=(10, 0), pady=5
-        )
+        change_pw_title.grid(row=0, column=0, columnspan=2, sticky=W, padx=(10, 0), pady=5)
         targeted_user_label.grid(row=1, column=0, sticky=W, padx=(10, 0), pady=3)
         targeted_user_label_details.grid(row=1, column=1, sticky=W, padx=5, pady=3)
         new_password_label.grid(row=2, column=0, sticky=W, padx=(10, 0), pady=3)
         new_password_entry.grid(row=2, column=1, sticky=W, padx=5, pady=3)
-        change_pw_btn.grid(
-            row=3, column=0, columnspan=2, sticky=W, padx=(10, 0), pady=5
-        )
+        change_pw_btn.grid(row=3, column=0, columnspan=2, padx=(10, 0), pady=5)
 
         change_pw_window.mainloop()
 
@@ -611,18 +711,22 @@ def admin_dashboard(username):
             product_tree.insert("", END, values=product)
 
     def clear_product_entry_field():
+        product_id_entry.delete(0, END)
         product_name_entry.delete(0, END)
         product_quantity_entry.delete(0, END)
         product_description_entry.delete(0, END)
+        product_min_stock_entry.delete(0, END)
 
     def display_product_record(event):
         selected_item = product_tree.focus()
         if selected_item:
             clear_product_entry_field()
             row = product_tree.item(selected_item)["values"]
+            product_id_entry.insert(0, [row[0]])
             product_name_entry.insert(0, row[1])
             product_quantity_entry.insert(0, row[2])
             product_description_entry.insert(0, row[3])
+            product_min_stock_entry.insert(0, [row[4]])
 
     def check_existing_product(product_check):
         conn = sqlite3.connect("Inventory Management System.db")
@@ -637,9 +741,11 @@ def admin_dashboard(username):
         return existing_supplier
 
     def add_new_product_details():
+        product_id = product_id_entry.get()
         product_name = product_name_entry.get()
         product_quantity = product_quantity_entry.get()
         product_description = product_description_entry.get()
+        product_min_stock = product_min_stock_entry.get()
 
         if not (product_name and product_quantity and product_description):
             messagebox.showerror("Error", "Please enter all fields")
@@ -648,9 +754,15 @@ def admin_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO PRODUCT (PRODUCT_NAME,PRODUCT_QUANTITY,PRODUCT_STATUS) \
-            VALUES (?,?,?)",
-                (product_name, product_quantity, product_description),
+                "INSERT INTO PRODUCT (PRODUCT_ID,PRODUCT_NAME,PRODUCT_QUANTITY,PRODUCT_STATUS,PRODUCT_MIN_STOCK) \
+            VALUES (?,?,?,?,?)",
+                (
+                    product_id,
+                    product_name,
+                    product_quantity,
+                    product_description,
+                    product_min_stock,
+                ),
             )
             conn.commit()
             conn.close()
@@ -661,6 +773,14 @@ def admin_dashboard(username):
             )
         add_to_product_table()
         clear_product_entry_field()
+        fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
         return
 
     def edit_product_details():
@@ -669,9 +789,11 @@ def admin_dashboard(username):
             messagebox.showerror("Error", "Please select a record to edit")
             return
         row = product_tree.item(selected_product_details)["values"]
+        new_product_id = product_id_entry.get()
         new_product_name = product_name_entry.get()
         new_product_quantity = product_quantity_entry.get()
         new_product_description = product_description_entry.get()
+        new_product_min_stock = product_min_stock_entry.get()
         if not new_product_name:
             messagebox.showerror("Error", "Please enter all fields")
             return
@@ -679,11 +801,13 @@ def admin_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE PRODUCT SET PRODUCT_NAME = ?, PRODUCT_QUANTITY = ?, PRODUCT_STATUS = ? WHERE PRODUCT_NAME = ?",
+                "UPDATE PRODUCT SET PRODUCT_ID = ?, PRODUCT_NAME = ?, PRODUCT_QUANTITY = ?, PRODUCT_STATUS = ?, PRODUCT_MIN_STOCK = ? WHERE PRODUCT_NAME = ?",
                 (
+                    new_product_id,
                     new_product_name,
                     new_product_quantity,
                     new_product_description,
+                    new_product_min_stock,
                     row[1],
                 ),
             )
@@ -692,6 +816,14 @@ def admin_dashboard(username):
             messagebox.showinfo("Success", "Record successfully edited")
         add_to_product_table()
         clear_product_entry_field()
+        fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def delete_product_database():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -703,6 +835,14 @@ def admin_dashboard(username):
         conn.close()
         add_to_product_table()
         clear_product_entry_field()
+        fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def delete_product_record():
         selected_item = product_tree.focus()
@@ -717,251 +857,306 @@ def admin_dashboard(username):
             messagebox.showinfo("Success", "Record successfully deleted")
             return
 
+    def search_product(event):
+        search_term = search_entry.get().lower()
+        products = fetch_product_data()
+        product_tree.delete(*product_tree.get_children())
+        for product in products:
+            if search_term in str(product).lower():
+                product_tree.insert("", tk.END, values=product)
 
-    # def on_product_double_click(event):
-    #
-    #     selected_item = product_tree.selection()[0]
-    #     values = product_tree.item(selected_item, "values")
-    #
-    #     def fetch_selected_product_details():
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT * FROM PRODUCT WHERE PRODUCT_NAME = ?", (values[1],))
-    #         product_details = cursor.fetchall()
-    #         conn.commit()
-    #         conn.close()
-    #         return product_details
-    #
-    #     new_window = customtkinter.CTk()
-    #     new_window.title("Product Details")
-    #     new_window.geometry("500x400")
-    #
-    #     def add_incoming_stock():
-    #         incoming_stock_id = generate_purchase_order_id("PO")
-    #         incoming_stock_product = values[1]
-    #         incoming_stock_quantity = restock_quantity_entry.get()
-    #         incoming_stock_status = "To be Received"
-    #
-    #         if not incoming_stock_quantity:
-    #             messagebox.showerror("Error", "Please enter all fields")
-    #             return
-    #
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "INSERT INTO PURCHASE_ORDER (PURCHASE_ORDER_ID,PURCHASE_ORDER_PRODUCT,PURCHASE_ORDER_PRODUCT_QUANTITY,PURCHASE_ORDER_STATUS) \
-    #         VALUES (?,?,?,?)",
-    #             (
-    #                 incoming_stock_id,
-    #                 incoming_stock_product,
-    #                 incoming_stock_quantity,
-    #                 incoming_stock_status,
-    #             ),
-    #         )
-    #         conn.commit()
-    #         conn.close()
-    #         messagebox.showinfo("Success", "Data has been inserted")
-    #         add_to_incoming_stock_table()
-    #         fetch_tbr_quantity()
-    #         new_window.destroy()
-    #
-    #     def fetch_tbr_quantity():
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "SELECT PURCHASE_ORDER_PRODUCT_QUANTITY FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_PRODUCT = ?",
-    #             (values[1],),
-    #         )
-    #         incoming_stock_quantity = cursor.fetchall()
-    #         tbr = 0
-    #         for x in incoming_stock_quantity:
-    #             tbr += x[0]
-    #         conn.commit()
-    #         conn.close()
-    #         return tbr
-    #
-    #     def fetch_tbs_quantity():
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "SELECT SALE_ORDER_PRODUCT_QUANTITY FROM SALE_ORDER_PRODUCT WHERE SALE_ORDER_PRODUCT = ?",
-    #             (values[1],),
-    #         )
-    #         outgoing_stock_quantity = cursor.fetchall()
-    #         tbs = 0
-    #         for x in outgoing_stock_quantity:
-    #             tbs += x[0]
-    #         conn.commit()
-    #         conn.close()
-    #         return tbs
-    #
-    #     product_details_frame = customtkinter.CTkFrame(
-    #         new_window,border_width=2
-    #     )
-    #     product_details_title = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text="Product Details",
-    #         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
-    #     )
-    #     product_id_label = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text="Product ID:",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_id_label_details = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text=f"{values[0]}",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_name_label = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text="Product Name:",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_name_label_details = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text=f"{values[1]}",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_quantity_label = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text="Product Quantity:",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_quantity_label_details = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text=f"{values[2]}",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_description_label = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text="Product Description:",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     product_description_label_details = customtkinter.CTkLabel(
-    #         product_details_frame,
-    #         text=f"{values[3]}",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #
-    #     restock_frame = customtkinter.CTkFrame(
-    #         new_window,border_width=2
-    #     )
-    #     restock_title = customtkinter.CTkLabel(
-    #         restock_frame,
-    #         text="Restock",
-    #         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
-    #     )
-    #     restock_quantity_label = customtkinter.CTkLabel(
-    #         restock_frame,
-    #         text="Restock Quantity:",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     restock_quantity_entry = customtkinter.CTkEntry(
-    #         master=restock_frame,
-    #         placeholder_text="Quantity",
-    #         width=230,
-    #         height=30,
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #         border_width=0,
-    #     )
-    #
-    #     restock_btn = customtkinter.CTkButton(
-    #         master=restock_frame,
-    #         text="Restock",
-    #         command=add_incoming_stock,
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #         corner_radius=200,
-    #         fg_color="#007FFF",
-    #         text_color="black",
-    #     )
-    #
-    #     status_frame = customtkinter.CTkFrame(
-    #         new_window, border_width=2
-    #     )
-    #     status_details_title = customtkinter.CTkLabel(
-    #         status_frame,
-    #         text="Status",
-    #         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
-    #     )
-    #     total_tbs = customtkinter.CTkFrame(
-    #         master=status_frame, width=100, height=100, fg_color="transparent"
-    #     )
-    #     total_tbs_details_1 = customtkinter.CTkLabel(
-    #         total_tbs,
-    #         text=(str(fetch_tbs_quantity()) + " Qty"),
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     total_tbs_details_2 = customtkinter.CTkLabel(
-    #         total_tbs,
-    #         text="To be Shipped",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     vertical_separator = customtkinter.CTkFrame(
-    #         status_frame, width=2, height=80, fg_color="#CCCCCC"
-    #     )
-    #     total_tbr = customtkinter.CTkFrame(
-    #         master=status_frame, width=100, height=100, fg_color="transparent"
-    #     )
-    #     total_tbr_details_1 = customtkinter.CTkLabel(
-    #         total_tbr,
-    #         text=(str(fetch_tbr_quantity()) + " Qty"),
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #     total_tbr_details_2 = customtkinter.CTkLabel(
-    #         total_tbr,
-    #         text="To be Received",
-    #         font=customtkinter.CTkFont("SF Pro Display", size=13),
-    #     )
-    #
-    #     product_details_frame.grid(
-    #         row=0, column=0, sticky=W, padx=10, pady=10
-    #     )
-    #     product_details_title.grid(
-    #         row=0, column=0, columnspan=2, sticky=W, padx=10, pady=10
-    #     )
-    #     product_id_label.grid(
-    #         row=1, column=0, sticky=W, padx=5, pady=5
-    #     )
-    #     product_id_label_details.grid(
-    #         row=1, column=1, sticky=W, padx=5, pady=5
-    #     )
-    #     product_name_label.grid(
-    #         row=2, column=0, sticky=W, padx=5, pady=5
-    #     )
-    #     product_name_label_details.grid(
-    #         row=2, column=1, sticky=W, padx=5, pady=5
-    #     )
-    #     product_quantity_label.grid(
-    #         row=3, column=0, sticky=W, padx=5, pady=5
-    #     )
-    #     product_quantity_label_details.grid(
-    #         row=3, column=1, sticky=W, padx=5, pady=5
-    #     )
-    #     product_description_label.grid(
-    #         row=4, column=0, sticky=W, padx=5, pady=5
-    #     )
-    #     product_description_label_details.grid(
-    #         row=4, column=1, sticky=W, padx=5, pady=5
-    #     )
-    #
-    #     restock_frame.grid(row=1, column=0, padx=10, pady=10,columnspan=2)
-    #     restock_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
-    #     restock_quantity_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
-    #     restock_quantity_entry.grid(row=1, column=1, sticky=W, padx=5, pady=5)
-    #     restock_btn.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
-    #
-    #     status_frame.grid(row=0,column=1,sticky=W,padx=10, pady=10)
-    #     status_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
-    #     total_tbs.grid(row=1, column=0, rowspan=5, padx=15, pady=15)
-    #     total_tbs_details_1.pack(side=TOP)
-    #     total_tbs_details_2.pack(side=BOTTOM)
-    #     vertical_separator.grid(row=1, column=1, rowspan=5, pady=36)
-    #     total_tbr.grid(row=1, column=3, rowspan=5, padx=15, pady=15)
-    #     total_tbr_details_1.pack(side=TOP)
-    #     total_tbr_details_2.pack(side=BOTTOM)
-    #
-    #     new_window.mainloop()
+    def on_product_double_click(event):
+
+        selected_item = product_tree.selection()[0]
+        values = product_tree.item(selected_item, "values")
+
+        def fetch_selected_product_details():
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM PRODUCT WHERE PRODUCT_NAME = ?", (values[1],))
+            product_details = cursor.fetchall()
+            conn.commit()
+            conn.close()
+            return product_details
+
+        new_window = customtkinter.CTk()
+        new_window.title("Product Details")
+        # new_window.geometry("500x400")
+
+        def add_incoming_stock():
+            incoming_stock_id = generate_purchase_order_id("PO")
+            incoming_stock_product = values[1]
+            incoming_stock_quantity = restock_quantity_entry.get()
+            incoming_stock_status = "To be Received"
+
+            if not incoming_stock_quantity:
+                messagebox.showerror("Error", "Please enter all fields")
+                return
+
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO PURCHASE_ORDER (PURCHASE_ORDER_ID,PURCHASE_ORDER_PRODUCT,PURCHASE_ORDER_PRODUCT_QUANTITY,PURCHASE_ORDER_STATUS) \
+            VALUES (?,?,?,?)",
+                (
+                    incoming_stock_id,
+                    incoming_stock_product,
+                    incoming_stock_quantity,
+                    incoming_stock_status,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            messagebox.showinfo("Success", "Data has been inserted")
+            add_to_incoming_stock_table()
+            fetch_tbr_quantity()
+            update_total_quantity_in_hand_label()
+            update_total_quantity_to_be_received_label()
+            new_window.destroy()
+
+        def fetch_tbr_quantity():
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT PURCHASE_ORDER_PRODUCT_QUANTITY FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_PRODUCT = ? AND PURCHASE_ORDER_STATUS=?",
+                (values[1], "To be Received"),
+            )
+            incoming_stock_quantity = cursor.fetchall()
+            tbr = 0
+            for x in incoming_stock_quantity:
+                tbr += x[0]
+            conn.commit()
+            conn.close()
+            return tbr
+
+        def fetch_tbs_quantity():
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT SALE_ORDER_PRODUCT_QUANTITY FROM SALE_ORDER_PRODUCT WHERE SALE_ORDER_PRODUCT = ?",
+                (values[1],),
+            )
+            outgoing_stock_quantity = cursor.fetchall()
+            tbs = 0
+            for x in outgoing_stock_quantity:
+                tbs += x[0]
+            conn.commit()
+            conn.close()
+            return tbs
+
+        product_details_frame = customtkinter.CTkFrame(new_window, border_width=2)
+        product_details_title = customtkinter.CTkLabel(
+            product_details_frame,
+            text="Product Details",
+            font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+        )
+        product_id_label = customtkinter.CTkLabel(
+            product_details_frame,
+            text="Product ID:",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_id_label_details = customtkinter.CTkLabel(
+            product_details_frame,
+            text=f"{values[0]}",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_name_label = customtkinter.CTkLabel(
+            product_details_frame,
+            text="Product Name:",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_name_label_details = customtkinter.CTkLabel(
+            product_details_frame,
+            text=f"{values[1]}",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_quantity_label = customtkinter.CTkLabel(
+            product_details_frame,
+            text="Product Quantity:",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_quantity_label_details = customtkinter.CTkLabel(
+            product_details_frame,
+            text=f"{values[2]}",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_description_label = customtkinter.CTkLabel(
+            product_details_frame,
+            text="Product Description:",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        product_description_label_details = customtkinter.CTkLabel(
+            product_details_frame,
+            text=f"{values[3]}",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+
+        restock_frame = customtkinter.CTkFrame(new_window, border_width=2)
+        restock_title = customtkinter.CTkLabel(
+            restock_frame,
+            text="Restock",
+            font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+        )
+        restock_quantity_label = customtkinter.CTkLabel(
+            restock_frame,
+            text="Restock Quantity:",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        restock_quantity_entry = customtkinter.CTkEntry(
+            master=restock_frame,
+            placeholder_text="Quantity",
+            width=230,
+            height=30,
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+            border_width=0,
+        )
+
+        restock_btn = customtkinter.CTkButton(
+            master=restock_frame,
+            text="Restock",
+            command=add_incoming_stock,
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+            corner_radius=200,
+            fg_color="#007FFF",
+            text_color="black",
+        )
+
+        status_frame = customtkinter.CTkFrame(new_window, border_width=2)
+        status_details_title = customtkinter.CTkLabel(
+            status_frame,
+            text="Status",
+            font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+        )
+        total_tbs = customtkinter.CTkFrame(
+            master=status_frame, width=100, height=100, fg_color="transparent"
+        )
+        total_tbs_details_1 = customtkinter.CTkLabel(
+            total_tbs,
+            text=(str(fetch_tbs_quantity()) + " Qty"),
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        total_tbs_details_2 = customtkinter.CTkLabel(
+            total_tbs,
+            text="To be Shipped",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        vertical_separator = customtkinter.CTkFrame(
+            status_frame, width=2, height=80, fg_color="#CCCCCC"
+        )
+        total_tbr = customtkinter.CTkFrame(
+            master=status_frame, width=100, height=100, fg_color="transparent"
+        )
+        total_tbr_details_1 = customtkinter.CTkLabel(
+            total_tbr,
+            text=(str(fetch_tbr_quantity()) + " Qty"),
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+        total_tbr_details_2 = customtkinter.CTkLabel(
+            total_tbr,
+            text="To be Received",
+            font=customtkinter.CTkFont("SF Pro Display", size=13),
+        )
+
+        product_details_frame.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+        product_details_title.grid(
+            row=0, column=0, columnspan=2, sticky=W, padx=10, pady=10
+        )
+        product_id_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
+        product_id_label_details.grid(row=1, column=1, sticky=W, padx=5, pady=5)
+        product_name_label.grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        product_name_label_details.grid(row=2, column=1, sticky=W, padx=5, pady=5)
+        product_quantity_label.grid(row=3, column=0, sticky=W, padx=5, pady=5)
+        product_quantity_label_details.grid(row=3, column=1, sticky=W, padx=5, pady=5)
+        product_description_label.grid(row=4, column=0, sticky=W, padx=5, pady=5)
+        product_description_label_details.grid(
+            row=4, column=1, sticky=W, padx=5, pady=5
+        )
+
+        restock_frame.grid(row=1, column=0, padx=10, pady=10, columnspan=2)
+        restock_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+        restock_quantity_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
+        restock_quantity_entry.grid(row=1, column=1, sticky=W, padx=5, pady=5)
+        restock_btn.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
+
+        status_frame.grid(row=0, column=1, sticky=W, padx=10, pady=10)
+        status_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+        total_tbs.grid(row=1, column=0, rowspan=5, padx=15, pady=15)
+        total_tbs_details_1.pack(side=TOP)
+        total_tbs_details_2.pack(side=BOTTOM)
+        vertical_separator.grid(row=1, column=1, rowspan=5, pady=36)
+        total_tbr.grid(row=1, column=3, rowspan=5, padx=15, pady=15)
+        total_tbr_details_1.pack(side=TOP)
+        total_tbr_details_2.pack(side=BOTTOM)
+
+        new_window.mainloop()
+
+    def sort_treeview_column(tv, col, reverse):
+        l = [(tv.set(k, col), k) for k in tv.get_children('')]
+        l.sort(reverse=reverse)
+
+        for index, (val, k) in enumerate(l):
+            tv.move(k, '', index)
+
+        tv.heading(col, command=lambda: sort_treeview_column(tv, col, not reverse))
+
+    def low_stock_vs_total_item_pie_chart(canvas):
+        data=[]
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT WHERE PRODUCT_QUANTITY < PRODUCT_MIN_STOCK")
+        low_stock_items = cursor.fetchone()[0]
+        data.append(low_stock_items)
+        conn.commit()
+        conn.close()
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT")
+        total_items = cursor.fetchone()[0]
+        data.append(total_items - low_stock_items)
+        conn.commit()
+        conn.close()
+
+        fig = plt.Figure()
+        ax = fig.add_subplot(111)
+        fig.patch.set_facecolor('#e5e5e5')  # Set the figure background color
+        ax.set_facecolor('#e5e5e5')  # Set the axes background color
+        ax.axis("equal")
+
+        ax.pie(data, labels=["Low Stock", "In Stock"], autopct="%.2f%%", pctdistance=0.85)
+
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+        ax.add_artist(centre_circle)
+
+        canvas.figure = fig
+        canvas.draw()
+
+    def bar_chart(canvas):
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT PRODUCT_ID, PRODUCT_QUANTITY FROM PRODUCT")
+        data = cursor.fetchall()
+        conn.commit()
+        conn.close()
+
+        product_ids = [row[0] for row in data]
+        product_quantities = [row[1] for row in data]
+
+        fig1 = plt.Figure()
+        ax = fig1.add_subplot(111)
+        fig1.patch.set_facecolor('#e5e5e5')
+        ax.set_facecolor('#e5e5e5')
+        ax.bar(product_ids, product_quantities)
+        ax.tick_params(axis='x', labelsize=5)
+        ax.tick_params(axis='y', labelsize=10)
+        ax.set_xlabel('Product Name', fontsize=12)
+        ax.set_ylabel('Product Quantity', fontsize=12)
+        ax.set_title('Inventory', fontsize=14)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
+
+        canvas.figure = fig1
+        canvas.draw()
 
     admin_dashboard_frame = customtkinter.CTkFrame(
         master=app, width=1280, height=720, border_width=0
@@ -985,89 +1180,192 @@ def admin_dashboard(username):
         font=customtkinter.CTkFont("SF Pro Display", 24, weight="bold"),
     )
 
-    sales_activity_frame = customtkinter.CTkFrame(tab_0, corner_radius=10)
+    sales_activity_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
     sales_activity_title = customtkinter.CTkLabel(
         sales_activity_frame,
         text="Sales Activity",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
     )
-    total_tbs = customtkinter.CTkFrame(
-        master=sales_activity_frame, fg_color="transparent"
-    )
-    total_tbs_details_1 = customtkinter.CTkLabel(
-        master=total_tbs,
-        text="0 Qty",
-        font=customtkinter.CTkFont("SF Pro Display", size=13),
-    )
-    total_tbs_details_2 = customtkinter.CTkLabel(
-        master=total_tbs,
-        text="To be Shipped",
-        font=customtkinter.CTkFont("SF Pro Display", size=13),
-    )
-    sales_activity_vertical_separator = customtkinter.CTkFrame(
-        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
-    )
-    total_tbr = customtkinter.CTkFrame(
-        master=sales_activity_frame, width=100, height=100, fg_color="transparent"
-    )
-    total_tbr_details_1 = customtkinter.CTkLabel(
-        total_tbr, text="0 Qty", font=customtkinter.CTkFont("SF Pro Display", size=13)
-    )
-    total_tbr_details_2 = customtkinter.CTkLabel(
-        total_tbr,
-        text="To be Received",
+
+    total_to_be_packed_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_packed_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
 
-    inventory_summary_frame = customtkinter.CTkFrame(tab_0, corner_radius=10)
+    total_to_be_packed_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Packed",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_1 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    total_to_be_shipped_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_shipped_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    total_to_be_shipped_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Shipped",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_2 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    total_to_be_delivered_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_delivered_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    total_to_be_delivered_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Delivered",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_3 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    inventory_summary_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
     inventory_summary_title = customtkinter.CTkLabel(
         inventory_summary_frame,
         text="Inventory Summary",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
     )
-    total_in_hand_1 = customtkinter.CTkLabel(
+
+    total_quantity_in_hand_1 = customtkinter.CTkLabel(
         master=inventory_summary_frame,
-        text="Quantity in Hand",
+        text=str(fetch_total_quantity_in_hand_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    total_in_hand_2 = customtkinter.CTkLabel(
+
+    total_quantity_in_hand_2 = customtkinter.CTkLabel(
         master=inventory_summary_frame,
-        text="12345",
+        text="Quantity In Hand",
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    inventory_summary_horizontal_separator = customtkinter.CTkFrame(
-        inventory_summary_frame, width=200, height=2, fg_color="#CCCCCC"
+
+    sales_activity_vertical_separator_4 = customtkinter.CTkFrame(
+        inventory_summary_frame, width=2, height=50, fg_color="#CCCCCC"
     )
-    total_tobereceived_details_1 = customtkinter.CTkLabel(
-        inventory_summary_frame,
-        text="Quantity To Be Received",
+
+    total_quantity_to_be_received_1 = customtkinter.CTkLabel(
+        master=inventory_summary_frame,
+        text=str(fetch_total_quantity_to_be_received_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    total_tobereceived_details_2 = customtkinter.CTkLabel(
-        inventory_summary_frame,
-        text="100",
+
+    total_quantity_to_be_received_2 = customtkinter.CTkLabel(
+        master=inventory_summary_frame,
+        text="Quantity To be Received",
         font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_5 = customtkinter.CTkFrame(
+        inventory_summary_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    product_details_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
+    product_details_title = customtkinter.CTkLabel(
+        product_details_frame,
+        text="Product Details",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+    )
+
+    low_stock_items_1 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text=str(fetch_low_stock_item_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    low_stock_items_2 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text="Low Stock Items",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_6 = customtkinter.CTkFrame(
+        product_details_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    all_items_1 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text=str(fetch_total_items_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    all_items_2 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text="Total Items",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_7 = customtkinter.CTkFrame(
+        product_details_frame, width=2, height=50, fg_color="#CCCCCC"
     )
 
     welcome_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
-    sales_activity_frame.grid(row=1, column=0, sticky=W, padx=10, pady=10)
-    inventory_summary_frame.grid(row=1, column=1, sticky=W, padx=10, pady=10)
+    sales_activity_frame.grid(row=1, column=0, padx=10, pady=10)
+    inventory_summary_frame.grid(row=1, column=1, padx=10, pady=10)
+    product_details_frame.grid(row=1, column=2, padx=10, pady=10)
+    fig = plt.Figure()
+    fig.set_facecolor('#e5e5e5')
+    canvas = FigureCanvasTkAgg(fig, master=tab_0)
+    canvas.get_tk_widget().grid(row=2, column=0, padx=10, pady=10, columnspan=3, sticky="W")
+    low_stock_vs_total_item_pie_chart(canvas)
+    fig1 = plt.Figure()
+    fig1.set_facecolor('#e5e5e5')
+    canvas1 = FigureCanvasTkAgg(fig1, master=tab_0)
+    canvas1.get_tk_widget().grid(row=2, column=1, padx=10, pady=10, columnspan=2)
+    bar_chart(canvas1)
 
-    sales_activity_title.grid(row=0, column=0, sticky=W, padx=20, pady=10)
-    total_tbs.grid(row=1, column=0, sticky=W, padx=40, pady=(20, 40))
-    total_tbs_details_1.pack(side=TOP)
-    total_tbs_details_2.pack(side=BOTTOM)
-    sales_activity_vertical_separator.grid(row=1, column=1)
-    total_tbr.grid(row=1, column=2, sticky=W, padx=40, pady=(20, 40))
-    total_tbr_details_1.pack(side=TOP)
-    total_tbr_details_2.pack(side=BOTTOM)
 
-    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=20, pady=10)
-    total_in_hand_1.grid(row=1, column=0, sticky=W, padx=10, pady=(0, 10))
-    total_in_hand_2.grid(row=1, column=1, sticky=W, padx=10, pady=(0, 10))
-    inventory_summary_horizontal_separator.grid(row=2, column=0, columnspan=2)
-    total_tobereceived_details_1.grid(row=3, column=0, sticky=W, padx=10, pady=(10, 10))
-    total_tobereceived_details_2.grid(row=3, column=1, sticky=W, padx=10, pady=(10, 10))
+    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    total_to_be_packed_label_1.grid(row=1, column=0, padx=20, pady=5)
+    total_to_be_packed_label_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    total_to_be_shipped_label_1.grid(row=1, column=2, padx=20, pady=5)
+    total_to_be_shipped_label_2.grid(row=2, column=2, padx=20, pady=5)
+    sales_activity_vertical_separator_2.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+    total_to_be_delivered_label_1.grid(row=1, column=4, padx=20, pady=5)
+    total_to_be_delivered_label_2.grid(row=2, column=4, padx=20, pady=5)
+    # sales_activity_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
+
+    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    total_quantity_in_hand_1.grid(row=1, column=0, padx=20, pady=5)
+    total_quantity_in_hand_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_4.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    total_quantity_to_be_received_1.grid(row=1, column=2, padx=20, pady=5)
+    total_quantity_to_be_received_2.grid(row=2, column=2, padx=20, pady=5)
+    # sales_activity_vertical_separator_5.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+
+    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    low_stock_items_1.grid(row=1, column=0, padx=20, pady=5)
+    low_stock_items_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_6.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    all_items_1.grid(row=1, column=2, padx=20, pady=5)
+    all_items_2.grid(row=2, column=2, padx=20, pady=5)
+    # sales_activity_vertical_separator_7.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+
+    tab_0.columnconfigure(1, weight=1)
 
     user_table_frame = customtkinter.CTkFrame(master=tab_1, width=780, height=645)
     user_table_frame.place(x=430, y=20)
@@ -1135,7 +1433,7 @@ def admin_dashboard(username):
 
     reg_accesslevel = customtkinter.CTkComboBox(
         master=tab_1,
-        values=["0", "1", "2"],
+        values=["Admin", "Supervisor", "Warehouse Worker"],
         width=300,
         height=30,
         font=customtkinter.CTkFont("SF Pro Display"),
@@ -1203,238 +1501,6 @@ def admin_dashboard(username):
         borderwidth=0,
     )
 
-    # customer_table_frame = customtkinter.CTkFrame(master=tab_2, width=1006, height=515)
-    # customer_table_frame.place(x=0, y=205)
-    #
-    # customer_tree = ttk.Treeview(master=customer_table_frame, height=18)
-    #
-    # customer_verscrlbar = customtkinter.CTkScrollbar(
-    #     master=customer_table_frame, orientation="vertical", command=customer_tree.yview
-    # )
-    # customer_verscrlbar.pack(side="right", fill="y")
-    #
-    # customer_tree.configure(yscrollcommand=customer_verscrlbar.set)
-    # customer_tree["columns"] = (
-    #     "CUSTOMERID",
-    #     "CUSTOMERNAME",
-    #     "CUSOTMEREMAILADDRESS",
-    #     "CUSTOMERCONTACTNO",
-    # )
-    #
-    # customer_tree.column("#0", width=0, stretch=tk.NO)
-    # customer_tree.column("CUSTOMERID", anchor=tk.CENTER, width=100)
-    # customer_tree.column("CUSTOMERNAME", anchor=tk.CENTER, width=290)
-    # customer_tree.column("CUSOTMEREMAILADDRESS", anchor=tk.CENTER, width=299)
-    # customer_tree.column("CUSTOMERCONTACTNO", anchor=tk.CENTER, width=290)
-    #
-    # customer_tree.heading("CUSTOMERID", text="ID")
-    # customer_tree.heading("CUSTOMERNAME", text="Name")
-    # customer_tree.heading("CUSOTMEREMAILADDRESS", text="Email Address")
-    # customer_tree.heading("CUSTOMERCONTACTNO", text="Contact No.")
-    #
-    # customer_tree.pack(side="right", fill="both")
-    # customer_tree.bind("<ButtonRelease>", display_customer_record)
-    #
-    # customer_name_entry = customtkinter.CTkEntry(
-    #     master=tab_2,
-    #     placeholder_text="Name",
-    #     width=230,
-    #     height=30,
-    #     font=customtkinter.CTkFont("SF Pro Display"),
-    #     border_width=0,
-    # )
-    # customer_name_entry.place(x=0, y=0)
-    #
-    # customer_email_entry = customtkinter.CTkEntry(
-    #     master=tab_2,
-    #     placeholder_text="Email Address",
-    #     width=230,
-    #     height=30,
-    #     font=customtkinter.CTkFont("SF Pro Display"),
-    #     border_width=0,
-    # )
-    # customer_email_entry.place(x=0, y=50)
-    #
-    # customer_contact_entry = customtkinter.CTkEntry(
-    #     master=tab_2,
-    #     placeholder_text="Contact No.",
-    #     width=230,
-    #     height=30,
-    #     font=customtkinter.CTkFont("SF Pro Display"),
-    #     border_width=0,
-    # )
-    # customer_contact_entry.place(x=0, y=100)
-    #
-    # addcustomer_btn_image = customtkinter.CTkImage(
-    #     Image.open("assets/plus.png"), size=(17, 17)
-    # )
-    # addcustomer_btn = customtkinter.CTkButton(
-    #     master=tab_2,
-    #     text="Add Customer",
-    #     width=230,
-    #     height=50,
-    #     font=customtkinter.CTkFont(("SF Pro Display")),
-    #     command=add_new_customer_details,
-    #     image=addcustomer_btn_image,
-    #     compound="top",
-    #     corner_radius=200,
-    #     fg_color="#007FFF",
-    #     text_color="black",
-    # )
-    # addcustomer_btn.place(x=250, y=0)
-    #
-    # editcustomer_btn_image = customtkinter.CTkImage(
-    #     Image.open("assets/edit.png"), size=(20, 20)
-    # )
-    # editcustomer_btn = customtkinter.CTkButton(
-    #     master=tab_2,
-    #     text="Edit Customer",
-    #     width=230,
-    #     height=50,
-    #     font=customtkinter.CTkFont(("SF Pro Display")),
-    #     command=edit_customer_details,
-    #     image=editcustomer_btn_image,
-    #     compound="top",
-    #     corner_radius=200,
-    #     fg_color="#ADD8E6",
-    #     text_color="black",
-    # )
-    # editcustomer_btn.place(x=250, y=60)
-    #
-    # deletecustomer_btn_image = customtkinter.CTkImage(
-    #     Image.open("assets/x.png"), size=(15, 15)
-    # )
-    # deletecustomer_btn = customtkinter.CTkButton(
-    #     master=tab_2,
-    #     text="Delete Customer",
-    #     width=230,
-    #     height=50,
-    #     font=customtkinter.CTkFont(("SF Pro Display")),
-    #     command=delete_customer_record,
-    #     image=deletecustomer_btn_image,
-    #     compound="top",
-    #     corner_radius=200,
-    #     fg_color="#ff666d",
-    #     text_color="black",
-    # )
-    # deletecustomer_btn.place(x=250, y=120)
-    #
-    # supplier_table_frame = customtkinter.CTkFrame(master=tab_3, width=1006, height=515)
-    # supplier_table_frame.place(x=0, y=205)
-    #
-    # supplier_tree = ttk.Treeview(master=supplier_table_frame, height=18)
-    #
-    # supplier_verscrlbar = customtkinter.CTkScrollbar(
-    #     master=supplier_table_frame, orientation="vertical", command=supplier_tree.yview
-    # )
-    # supplier_verscrlbar.pack(side="right", fill="y")
-    #
-    # supplier_tree.configure(yscrollcommand=supplier_verscrlbar.set)
-    # supplier_tree["columns"] = (
-    #     "SUPPLIERID",
-    #     "SUPPLIERNAME",
-    #     "SUPPLIEREMAILADDRESS",
-    #     "SUPPLIERCONTACTNO",
-    # )
-    #
-    # supplier_tree.column("#0", width=0, stretch=tk.NO)
-    # supplier_tree.column("SUPPLIERID", anchor=tk.CENTER, width=100)
-    # supplier_tree.column("SUPPLIERNAME", anchor=tk.CENTER, width=290)
-    # supplier_tree.column("SUPPLIEREMAILADDRESS", anchor=tk.CENTER, width=299)
-    # supplier_tree.column("SUPPLIERCONTACTNO", anchor=tk.CENTER, width=290)
-    #
-    # supplier_tree.heading("SUPPLIERID", text="ID")
-    # supplier_tree.heading("SUPPLIERNAME", text="Name")
-    # supplier_tree.heading("SUPPLIEREMAILADDRESS", text="Email Address")
-    # supplier_tree.heading("SUPPLIERCONTACTNO", text="Contact No.")
-    #
-    # supplier_tree.pack(side="right", fill="both")
-    # supplier_tree.bind("<ButtonRelease>", display_supplier_record)
-    #
-    # supplier_name_entry = customtkinter.CTkEntry(
-    #     master=tab_3,
-    #     placeholder_text="Name",
-    #     width=230,
-    #     height=30,
-    #     font=customtkinter.CTkFont("SF Pro Display"),
-    #     border_width=0,
-    # )
-    # supplier_name_entry.place(x=0, y=0)
-    #
-    # supplier_email_entry = customtkinter.CTkEntry(
-    #     master=tab_3,
-    #     placeholder_text="Email Address",
-    #     width=230,
-    #     height=30,
-    #     font=customtkinter.CTkFont("SF Pro Display"),
-    #     border_width=0,
-    # )
-    # supplier_email_entry.place(x=0, y=50)
-    #
-    # supplier_contact_entry = customtkinter.CTkEntry(
-    #     master=tab_3,
-    #     placeholder_text="Contact No.",
-    #     width=230,
-    #     height=30,
-    #     font=customtkinter.CTkFont("SF Pro Display"),
-    #     border_width=0,
-    # )
-    # supplier_contact_entry.place(x=0, y=100)
-    #
-    # addsupplier_btn_image = customtkinter.CTkImage(
-    #     Image.open("assets/plus.png"), size=(17, 17)
-    # )
-    # addsupplier_btn = customtkinter.CTkButton(
-    #     master=tab_3,
-    #     text="Add Supplier",
-    #     width=230,
-    #     height=50,
-    #     font=customtkinter.CTkFont(("SF Pro Display")),
-    #     command=add_new_supplier_details,
-    #     image=addsupplier_btn_image,
-    #     compound="top",
-    #     corner_radius=200,
-    #     fg_color="#007FFF",
-    #     text_color="black",
-    # )
-    # addsupplier_btn.place(x=250, y=0)
-    #
-    # editsupplier_btn_image = customtkinter.CTkImage(
-    #     Image.open("assets/edit.png"), size=(20, 20)
-    # )
-    # editsupplier_btn = customtkinter.CTkButton(
-    #     master=tab_3,
-    #     text="Edit Supplier",
-    #     width=230,
-    #     height=50,
-    #     font=customtkinter.CTkFont(("SF Pro Display")),
-    #     command=edit_supplier_details,
-    #     image=editsupplier_btn_image,
-    #     compound="top",
-    #     corner_radius=200,
-    #     fg_color="#ADD8E6",
-    #     text_color="black",
-    # )
-    # editsupplier_btn.place(x=250, y=60)
-    #
-    # deletesupplier_btn_image = customtkinter.CTkImage(
-    #     Image.open("assets/x.png"), size=(15, 15)
-    # )
-    # deletesupplier_btn = customtkinter.CTkButton(
-    #     master=tab_3,
-    #     text="Delete Supplier",
-    #     width=230,
-    #     height=50,
-    #     font=customtkinter.CTkFont(("SF Pro Display")),
-    #     command=delete_supplier_record,
-    #     image=deletesupplier_btn_image,
-    #     compound="top",
-    #     corner_radius=200,
-    #     fg_color="#ff666d",
-    #     text_color="black",
-    # )
-    # deletesupplier_btn.place(x=250, y=120)
-
     product_table_frame = customtkinter.CTkFrame(master=tab_4, width=1280, height=515)
     product_table_frame.place(x=0, y=205)
 
@@ -1451,49 +1517,110 @@ def admin_dashboard(username):
         "PRODUCTNAME",
         "PRODUCTQUANTITY",
         "PRODUCTDESCRIPTION",
+        "PRODUCTMINSTOCK",
     )
 
     product_tree.column("#0", width=0, stretch=tk.NO)
-    product_tree.column("PRODUCTID", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTNAME", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTQUANTITY", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTDESCRIPTION", anchor=tk.CENTER, width=313)
+    product_tree.column("PRODUCTID", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTNAME", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTQUANTITY", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTDESCRIPTION", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTMINSTOCK", anchor=tk.CENTER, width=250)
 
-    product_tree.heading("PRODUCTID", text="ID")
+    product_tree.heading("PRODUCTID", text="ID", command=lambda: sort_treeview_column(product_tree, "PRODUCTID", False))
     product_tree.heading("PRODUCTNAME", text="Name")
     product_tree.heading("PRODUCTQUANTITY", text="Quantity")
     product_tree.heading("PRODUCTDESCRIPTION", text="Description")
+    product_tree.heading("PRODUCTMINSTOCK", text="Min. Stock")
 
     product_tree.pack(side="bottom", fill="both")
-    # product_tree.bind("<Double-1>", on_product_double_click)
+    product_tree.bind("<Double-1>", on_product_double_click)
     product_tree.bind("<ButtonRelease>", display_product_record)
 
-    insert_product_data_label = customtkinter.CTkLabel(
+    search_entry = customtkinter.CTkEntry(tab_4,placeholder_text="Search", width=1050,)
+    search_entry.grid(row=1,column=0, padx=10, pady=10)
+    search_entry.bind("<KeyRelease>", search_product)
+
+    product_menu_frame = customtkinter.CTkFrame(
         master=tab_4,
+        border_width=2
+    )
+
+    insert_product_data_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
         text="Insert New Product",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
-    product_name_entry = customtkinter.CTkEntry(
-        master=tab_4,
-        placeholder_text="Items",
+
+    product_id_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product ID:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_id_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="ID",
         width=230,
         height=30,
         font=customtkinter.CTkFont("SF Pro Display"),
         border_width=0,
+    )
+
+    product_name_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_name_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="Item",
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+
+    product_quantity_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Quantity:",
+        font=customtkinter.CTkFont("SF Pro Display"),
     )
 
     product_quantity_entry = customtkinter.CTkEntry(
-        master=tab_4,
-        placeholder_text="Amount",
+        master=product_menu_frame,
+        placeholder_text="Quantity",
         width=230,
         height=30,
         font=customtkinter.CTkFont("SF Pro Display"),
         border_width=0,
     )
 
+    product_description_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Description:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_description_entry = customtkinter.CTkEntry(
-        master=tab_4,
-        placeholder_text="Notes",
+        master=product_menu_frame,
+        placeholder_text="Description",
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+
+    product_min_stock_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Min. Stock:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_min_stock_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="Min. Stock",
         width=230,
         height=30,
         font=customtkinter.CTkFont("SF Pro Display"),
@@ -1501,7 +1628,7 @@ def admin_dashboard(username):
     )
 
     addproduct_btn = customtkinter.CTkButton(
-        master=tab_4,
+        master=product_menu_frame,
         text="Add Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_product_details,
@@ -1512,7 +1639,7 @@ def admin_dashboard(username):
     )
 
     editproduct_btn = customtkinter.CTkButton(
-        master=tab_4,
+        master=product_menu_frame,
         text="Edit Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_product_details,
@@ -1523,7 +1650,7 @@ def admin_dashboard(username):
     )
 
     deleteproduct_btn = customtkinter.CTkButton(
-        master=tab_4,
+        master=product_menu_frame,
         text="Delete Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_product_record,
@@ -1533,21 +1660,131 @@ def admin_dashboard(username):
         text_color="black",
     )
 
-    insert_product_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    product_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    product_quantity_entry.grid(row=1, column=1, padx=5, pady=5)
-    product_description_entry.grid(row=1, column=2, padx=5, pady=5)
-    addproduct_btn.grid(row=2, column=3, padx=20, pady=80)
-    editproduct_btn.grid(row=2, column=4, padx=20, pady=80)
-    deleteproduct_btn.grid(row=2, column=5, padx=20, pady=80)
+    product_menu_frame.grid(row=0, column=0)
+
+    insert_product_data_label.grid(
+        row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2
+    )
+
+    product_id_entry_label.grid(row=1, column=0, padx=5)
+    product_id_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    product_name_entry_label.grid(row=1, column=2, padx=5)
+    product_name_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+    product_quantity_entry_label.grid(row=1, column=4, padx=5)
+    product_quantity_entry.grid(row=1, column=5, padx=5, pady=5, sticky="w")
+    product_description_entry_label.grid(row=2, column=0, padx=5)
+    product_description_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+    product_min_stock_entry_label.grid(row=2, column=2, padx=5)
+    product_min_stock_entry.grid(row=2, column=3, padx=5, pady=5)
+
+    addproduct_btn.grid(row=3, column=0, padx=20, pady=5, columnspan=2)
+    editproduct_btn.grid(row=3, column=2, padx=20, pady=5, columnspan=2)
+    deleteproduct_btn.grid(row=3, column=4, padx=20, pady=5, columnspan=2)
+
+    tab_4.columnconfigure(0,weight=1)
 
     add_to_user_table()
-    # add_to_customer_table()
-    # add_to_supplier_table()
     add_to_product_table()
 
 
 def supervisor_dashboard(username):
+    def fetch_to_be_packed_data():
+        total_to_be_packed = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Packed",))
+        to_be_packed_data = cursor.fetchone()[0]
+        total_to_be_packed += to_be_packed_data
+        conn.commit()
+        conn.close()
+        return total_to_be_packed
+
+    def update_to_be_packed_label():
+        new_count = fetch_to_be_packed_data()
+        total_to_be_packed_label_1.configure(text=str(new_count))
+
+    def fetch_to_be_shipped_data():
+        total_to_be_shipped = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Shipped",))
+        to_be_shipped_data = cursor.fetchone()[0]
+        total_to_be_shipped += to_be_shipped_data
+        conn.commit()
+        conn.close()
+        return total_to_be_shipped
+
+    def update_to_be_shipped_label():
+        new_count = fetch_to_be_shipped_data()
+        total_to_be_shipped_label_1.configure(text=str(new_count))
+
+    def fetch_to_be_delivered_data():
+        total_to_be_delivered = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Delivered",))
+        to_be_delivered_data = cursor.fetchone()[0]
+        total_to_be_delivered += to_be_delivered_data
+        conn.commit()
+        conn.close()
+        return total_to_be_delivered
+
+    def update_to_be_delivered_label():
+        new_count = fetch_to_be_delivered_data()
+        total_to_be_delivered_label_1.configure(text=str(new_count))
+
+    def fetch_total_quantity_in_hand_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(PRODUCT_QUANTITY) FROM PRODUCT")
+        total_quantity_in_hand = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_quantity_in_hand
+
+    def update_total_quantity_in_hand_label():
+        new_count = fetch_total_quantity_in_hand_data()
+        total_quantity_in_hand_1.configure(text=str(new_count))
+
+    def fetch_total_quantity_to_be_received_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?", ("To be Received",))
+        total_quantity_to_be_received = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_quantity_to_be_received
+
+    def update_total_quantity_to_be_received_label():
+        new_count = fetch_total_quantity_to_be_received_data()
+        total_quantity_to_be_received_1.configure(text=str(new_count))
+
+    def fetch_low_stock_item_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT WHERE PRODUCT_QUANTITY < PRODUCT_MIN_STOCK")
+        low_stock_items = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return low_stock_items
+
+    def update_low_stock_item_label():
+        new_count = fetch_low_stock_item_data()
+        low_stock_items_1.configure(text=str(new_count))
+
+    def fetch_total_items_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT")
+        total_items = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_items
+
+    def update_total_items_label():
+        new_count = fetch_total_items_data()
+        all_items_1.configure(text=str(new_count))
+
     def fetch_customer_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -1571,6 +1808,24 @@ def supervisor_dashboard(username):
             customer_email_entry.insert(0, row[2])
             customer_contact_entry.insert(0, row[3])
 
+    def fetch_customer_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(CUSTOMER_ID) FROM CUSTOMER")
+        last_customer_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_customer_id
+
+    def generate_customer_id(prefix="CUST"):
+        last_customer_id = fetch_customer_last_id()
+        if last_customer_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def add_to_customer_table():
         customers = fetch_customer_data()
         customer_tree.delete(*customer_tree.get_children())
@@ -1589,7 +1844,15 @@ def supervisor_dashboard(username):
         conn.close()
         return existing_customer
 
+    def is_valid_email(email):
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email)
+
+    def is_valid_contact_number(contact_number):
+        return contact_number.isdigit()
+
     def add_new_customer_details():
+        customer_id = generate_customer_id("CUST")
         customer_name = customer_name_entry.get()
         customer_email = customer_email_entry.get()
         customer_contactno = customer_contact_entry.get()
@@ -1597,13 +1860,22 @@ def supervisor_dashboard(username):
         if not (customer_name and customer_email and customer_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        elif not check_existing_customer(customer_name):
+
+        if not is_valid_email(customer_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(customer_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        if not check_existing_customer(customer_name):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO CUSTOMER (CUSTOMER_NAME,CUSTOMER_EMAIL,CUSTOMER_TEL) \
-            VALUES (?,?,?)",
-                (customer_name, customer_email, customer_contactno),
+                "INSERT INTO CUSTOMER (CUSTOMER_ID,CUSTOMER_NAME,CUSTOMER_EMAIL,CUSTOMER_TEL) \
+                VALUES (?,?,?,?)",
+                (customer_id, customer_name, customer_email, customer_contactno),
             )
             conn.commit()
             conn.close()
@@ -1621,23 +1893,33 @@ def supervisor_dashboard(username):
         if not selected_customer_details:
             messagebox.showerror("Error", "Please select a record to edit")
             return
+
         row = customer_tree.item(selected_customer_details)["values"]
         new_customer_name = customer_name_entry.get()
         new_customer_email = customer_email_entry.get()
         new_customer_contactno = customer_contact_entry.get()
-        if not new_customer_name:
+
+        if not (new_customer_name and new_customer_email and new_customer_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        else:
-            conn = sqlite3.connect("Inventory Management System.db")
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE CUSTOMER SET CUSTOMER_NAME = ?, CUSTOMER_EMAIL = ?, CUSTOMER_TEL = ? WHERE CUSTOMER_NAME = ?",
-                (new_customer_name, new_customer_email, new_customer_contactno, row[1]),
-            )
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", "Record successfully edited")
+
+        if not is_valid_email(new_customer_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(new_customer_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE CUSTOMER SET CUSTOMER_NAME = ?, CUSTOMER_EMAIL = ?, CUSTOMER_TEL = ? WHERE CUSTOMER_NAME = ?",
+            (new_customer_name, new_customer_email, new_customer_contactno, row[1]),
+        )
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", "Record successfully edited")
         add_to_customer_table()
         clear_customer_entry_field()
 
@@ -1701,9 +1983,9 @@ def supervisor_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO SALE_ORDER (SALE_ORDER_ID,SALE_ORDER_DATE,SALE_ORDER_CUSTOMER) \
-            VALUES (?,?,?)",
-                (sale_order_id, sale_order_date, customer_name),
+                "INSERT INTO SALE_ORDER (SALE_ORDER_ID,SALE_ORDER_DATE,SALE_ORDER_CUSTOMER,SALE_ORDER_STATUS) \
+            VALUES (?,?,?,?)",
+                (sale_order_id, sale_order_date, customer_name, "To be packed"),
             )
             conn.commit()
             conn.close()
@@ -1713,7 +1995,6 @@ def supervisor_dashboard(username):
 
         sales_window = customtkinter.CTk()
         sales_window.title("Product Details")
-        sales_window.geometry("470x370")
 
         customer_id_label = customtkinter.CTkLabel(
             sales_window,
@@ -1862,7 +2143,26 @@ def supervisor_dashboard(username):
         conn.close()
         return existing_supplier
 
+    def fetch_supplier_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(SUPPLIER_ID ) FROM SUPPLIER")
+        last_supplier_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_supplier_id
+
+    def generate_supplier_id(prefix="SUPP"):
+        last_supplier_id = fetch_supplier_last_id()
+        if last_supplier_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_supplier_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def add_new_supplier_details():
+        supplier_id = generate_supplier_id("SUPP")
         supplier_name = supplier_name_entry.get()
         supplier_email = supplier_email_entry.get()
         supplier_contactno = supplier_contact_entry.get()
@@ -1870,21 +2170,31 @@ def supervisor_dashboard(username):
         if not (supplier_name and supplier_email and supplier_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        elif not check_existing_supplier(supplier_name):
+
+        if not is_valid_email(supplier_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(supplier_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        if not check_existing_supplier(supplier_name):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO SUPPLIER (SUPPLIER_NAME,SUPPLIER_EMAIL,SUPPLIER_TEL) \
-            VALUES (?,?,?)",
-                (supplier_name, supplier_name, supplier_contactno),
+                "INSERT INTO SUPPLIER (SUPPLIER_ID,SUPPLIER_NAME,SUPPLIER_EMAIL,SUPPLIER_TEL) \
+                VALUES (?,?,?,?)",
+                (supplier_id, supplier_name, supplier_email, supplier_contactno),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Success", "Data has been inserted")
         else:
             messagebox.showerror(
-                "Warning", "Duplicate customer! Please enter new customer."
+                "Warning", "Duplicate supplier! Please enter new supplier."
             )
+
         add_to_supplier_table()
         clear_supplier_entry_field()
         return
@@ -1894,23 +2204,34 @@ def supervisor_dashboard(username):
         if not selected_supplier_details:
             messagebox.showerror("Error", "Please select a record to edit")
             return
+
         row = supplier_tree.item(selected_supplier_details)["values"]
         new_supplier_name = supplier_name_entry.get()
         new_supplier_email = supplier_email_entry.get()
         new_supplier_contactno = supplier_contact_entry.get()
-        if not new_supplier_name:
+
+        if not (new_supplier_name and new_supplier_email and new_supplier_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        else:
-            conn = sqlite3.connect("Inventory Management System.db")
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE SUPPLIER SET SUPPLIER_NAME = ?, SUPPLIER_EMAIL = ?, SUPPLIER_TEL = ? WHERE SUPPLIER_NAME = ?",
-                (new_supplier_name, new_supplier_email, new_supplier_contactno, row[1]),
-            )
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", "Record successfully edited")
+
+        if not is_valid_email(new_supplier_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(new_supplier_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE SUPPLIER SET SUPPLIER_NAME = ?, SUPPLIER_EMAIL = ?, SUPPLIER_TEL = ? WHERE SUPPLIER_NAME = ?",
+            (new_supplier_name, new_supplier_email, new_supplier_contactno, row[1]),
+        )
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", "Record successfully edited")
+
         add_to_supplier_table()
         clear_supplier_entry_field()
 
@@ -1954,18 +2275,22 @@ def supervisor_dashboard(username):
             product_tree.insert("", END, values=product)
 
     def clear_product_entry_field():
+        product_id_entry.delete(0, END)
         product_name_entry.delete(0, END)
         product_quantity_entry.delete(0, END)
         product_description_entry.delete(0, END)
+        product_min_stock_entry.delete(0, END)
 
     def display_product_record(event):
         selected_item = product_tree.focus()
         if selected_item:
             clear_product_entry_field()
             row = product_tree.item(selected_item)["values"]
+            product_id_entry.insert(0, [row[0]])
             product_name_entry.insert(0, row[1])
             product_quantity_entry.insert(0, row[2])
             product_description_entry.insert(0, row[3])
+            product_min_stock_entry.insert(0, [row[4]])
 
     def check_existing_product(product_check):
         conn = sqlite3.connect("Inventory Management System.db")
@@ -1980,9 +2305,11 @@ def supervisor_dashboard(username):
         return existing_supplier
 
     def add_new_product_details():
+        product_id = product_id_entry.get()
         product_name = product_name_entry.get()
         product_quantity = product_quantity_entry.get()
         product_description = product_description_entry.get()
+        product_min_stock = product_min_stock_entry.get()
 
         if not (product_name and product_quantity and product_description):
             messagebox.showerror("Error", "Please enter all fields")
@@ -1991,9 +2318,15 @@ def supervisor_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO PRODUCT (PRODUCT_NAME,PRODUCT_QUANTITY,PRODUCT_STATUS) \
-            VALUES (?,?,?)",
-                (product_name, product_quantity, product_description),
+                "INSERT INTO PRODUCT (PRODUCT_ID,PRODUCT_NAME,PRODUCT_QUANTITY,PRODUCT_STATUS,PRODUCT_MIN_STOCK) \
+            VALUES (?,?,?,?,?)",
+                (
+                    product_id,
+                    product_name,
+                    product_quantity,
+                    product_description,
+                    product_min_stock,
+                ),
             )
             conn.commit()
             conn.close()
@@ -2005,6 +2338,13 @@ def supervisor_dashboard(username):
         add_to_product_table()
         clear_product_entry_field()
         fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
         return
 
     def edit_product_details():
@@ -2013,9 +2353,11 @@ def supervisor_dashboard(username):
             messagebox.showerror("Error", "Please select a record to edit")
             return
         row = product_tree.item(selected_product_details)["values"]
+        new_product_id = product_id_entry.get()
         new_product_name = product_name_entry.get()
         new_product_quantity = product_quantity_entry.get()
         new_product_description = product_description_entry.get()
+        new_product_min_stock = product_min_stock_entry.get()
         if not new_product_name:
             messagebox.showerror("Error", "Please enter all fields")
             return
@@ -2023,11 +2365,13 @@ def supervisor_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE PRODUCT SET PRODUCT_NAME = ?, PRODUCT_QUANTITY = ?, PRODUCT_STATUS = ? WHERE PRODUCT_NAME = ?",
+                "UPDATE PRODUCT SET PRODUCT_ID = ?, PRODUCT_NAME = ?, PRODUCT_QUANTITY = ?, PRODUCT_STATUS = ?, PRODUCT_MIN_STOCK = ? WHERE PRODUCT_NAME = ?",
                 (
+                    new_product_id,
                     new_product_name,
                     new_product_quantity,
                     new_product_description,
+                    new_product_min_stock,
                     row[1],
                 ),
             )
@@ -2037,6 +2381,13 @@ def supervisor_dashboard(username):
         add_to_product_table()
         clear_product_entry_field()
         fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def delete_product_database():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -2049,6 +2400,13 @@ def supervisor_dashboard(username):
         add_to_product_table()
         clear_product_entry_field()
         fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def delete_product_record():
         selected_item = product_tree.focus()
@@ -2062,6 +2420,14 @@ def supervisor_dashboard(username):
             delete_product_database()
             messagebox.showinfo("Success", "Record successfully deleted")
             return
+
+    def search_product(event):
+        search_term = search_entry.get().lower()
+        products = fetch_product_data()
+        product_tree.delete(*product_tree.get_children())
+        for product in products:
+            if search_term in str(product).lower():
+                product_tree.insert("", tk.END, values=product)
 
     def on_product_double_click(event):
 
@@ -2079,7 +2445,7 @@ def supervisor_dashboard(username):
 
         new_window = customtkinter.CTk()
         new_window.title("Product Details")
-        new_window.geometry("500x400")
+        # new_window.geometry("500x400")
 
         def add_incoming_stock():
             incoming_stock_id = generate_purchase_order_id("PO")
@@ -2108,6 +2474,8 @@ def supervisor_dashboard(username):
             messagebox.showinfo("Success", "Data has been inserted")
             add_to_incoming_stock_table()
             fetch_tbr_quantity()
+            update_total_quantity_in_hand_label()
+            update_total_quantity_to_be_received_label()
             new_window.destroy()
 
         def fetch_tbr_quantity():
@@ -2115,7 +2483,7 @@ def supervisor_dashboard(username):
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT PURCHASE_ORDER_PRODUCT_QUANTITY FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_PRODUCT = ? AND PURCHASE_ORDER_STATUS=?",
-                (values[1],"To be Received"),
+                (values[1], "To be Received"),
             )
             incoming_stock_quantity = cursor.fetchall()
             tbr = 0
@@ -2140,9 +2508,7 @@ def supervisor_dashboard(username):
             conn.close()
             return tbs
 
-        product_details_frame = customtkinter.CTkFrame(
-            new_window,border_width=2
-        )
+        product_details_frame = customtkinter.CTkFrame(new_window, border_width=2)
         product_details_title = customtkinter.CTkLabel(
             product_details_frame,
             text="Product Details",
@@ -2189,9 +2555,7 @@ def supervisor_dashboard(username):
             font=customtkinter.CTkFont("SF Pro Display", size=13),
         )
 
-        restock_frame = customtkinter.CTkFrame(
-            new_window,border_width=2
-        )
+        restock_frame = customtkinter.CTkFrame(new_window, border_width=2)
         restock_title = customtkinter.CTkLabel(
             restock_frame,
             text="Restock",
@@ -2221,9 +2585,7 @@ def supervisor_dashboard(username):
             text_color="black",
         )
 
-        status_frame = customtkinter.CTkFrame(
-            new_window, border_width=2
-        )
+        status_frame = customtkinter.CTkFrame(new_window, border_width=2)
         status_details_title = customtkinter.CTkLabel(
             status_frame,
             text="Status",
@@ -2259,44 +2621,28 @@ def supervisor_dashboard(username):
             font=customtkinter.CTkFont("SF Pro Display", size=13),
         )
 
-        product_details_frame.grid(
-            row=0, column=0, sticky=W, padx=10, pady=10
-        )
+        product_details_frame.grid(row=0, column=0, sticky=W, padx=10, pady=10)
         product_details_title.grid(
             row=0, column=0, columnspan=2, sticky=W, padx=10, pady=10
         )
-        product_id_label.grid(
-            row=1, column=0, sticky=W, padx=5, pady=5
-        )
-        product_id_label_details.grid(
-            row=1, column=1, sticky=W, padx=5, pady=5
-        )
-        product_name_label.grid(
-            row=2, column=0, sticky=W, padx=5, pady=5
-        )
-        product_name_label_details.grid(
-            row=2, column=1, sticky=W, padx=5, pady=5
-        )
-        product_quantity_label.grid(
-            row=3, column=0, sticky=W, padx=5, pady=5
-        )
-        product_quantity_label_details.grid(
-            row=3, column=1, sticky=W, padx=5, pady=5
-        )
-        product_description_label.grid(
-            row=4, column=0, sticky=W, padx=5, pady=5
-        )
+        product_id_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
+        product_id_label_details.grid(row=1, column=1, sticky=W, padx=5, pady=5)
+        product_name_label.grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        product_name_label_details.grid(row=2, column=1, sticky=W, padx=5, pady=5)
+        product_quantity_label.grid(row=3, column=0, sticky=W, padx=5, pady=5)
+        product_quantity_label_details.grid(row=3, column=1, sticky=W, padx=5, pady=5)
+        product_description_label.grid(row=4, column=0, sticky=W, padx=5, pady=5)
         product_description_label_details.grid(
             row=4, column=1, sticky=W, padx=5, pady=5
         )
 
-        restock_frame.grid(row=1, column=0, padx=10, pady=10,columnspan=2)
+        restock_frame.grid(row=1, column=0, padx=10, pady=10, columnspan=2)
         restock_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
         restock_quantity_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
         restock_quantity_entry.grid(row=1, column=1, sticky=W, padx=5, pady=5)
         restock_btn.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
 
-        status_frame.grid(row=0,column=1,sticky=W,padx=10, pady=10)
+        status_frame.grid(row=0, column=1, sticky=W, padx=10, pady=10)
         status_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
         total_tbs.grid(row=1, column=0, rowspan=5, padx=15, pady=15)
         total_tbs_details_1.pack(side=TOP)
@@ -2311,7 +2657,9 @@ def supervisor_dashboard(username):
     def fetch_task_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE FROM TASK")
+        cursor.execute(
+            "SELECT TASK_ID,TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE FROM TASK"
+        )
         task = cursor.fetchall()
         conn.commit()
         conn.close()
@@ -2339,7 +2687,26 @@ def supervisor_dashboard(username):
         for task in tasks:
             task_tree.insert("", END, values=task, tags=task)
 
+    def fetch_task_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(TASK_ID) FROM TASK")
+        last_task_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_task_id
+
+    def generate_task_id(prefix="TASK"):
+        last_task_id = fetch_task_last_id()
+        if last_task_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_task_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def add_new_task_details():
+        task_id = generate_task_id("TASK")
         task_name = task_entry.get()
         assigned_worker = assigned_worker_entry.get()
         task_due_date = task_due_date_entry.get()
@@ -2351,15 +2718,14 @@ def supervisor_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO TASK (TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE) \
-            VALUES (?,?,?,?)",
-                (task_name, assigned_worker, "Pending", task_due_date),
+                "INSERT INTO TASK (TASK_ID,TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE) \
+            VALUES (?,?,?,?,?)",
+                (task_id, task_name, assigned_worker, "Pending", task_due_date),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Success", "Data has been inserted")
         add_to_task_table()
-        # clear_task_entry_field
         return
 
     def edit_task_details():
@@ -2379,13 +2745,12 @@ def supervisor_dashboard(username):
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE TASK SET TASK_DESCRIPTION = ?, TASK_ASSIGNED_TO = ?, TASK_DUE_DATE = ? WHERE TASK_DESCRIPTION = ?",
-                (new_task, new_assigned_worker,new_due_date, row[0]),
+                (new_task, new_assigned_worker, new_due_date, row[0]),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Success", "Record successfully edited")
         add_to_task_table()
-        # clear_customer_entry_field()
 
     def delete_task_database():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -2396,7 +2761,6 @@ def supervisor_dashboard(username):
         conn.commit()
         conn.close()
         add_to_task_table()
-        # clear_customer_entry_field()
 
     def delete_task_record():
         selected_item = task_tree.focus()
@@ -2442,7 +2806,9 @@ def supervisor_dashboard(username):
         incoming_stocks = fetch_incoming_stock_data()
         incoming_stock_tree.delete(*incoming_stock_tree.get_children())
         for incoming_stock in incoming_stocks:
-            incoming_stock_tree.insert("", END, values=incoming_stock, tags=incoming_stock)
+            incoming_stock_tree.insert(
+                "", END, values=incoming_stock, tags=incoming_stock
+            )
 
     def update_purchase_order_status():
         new_status = purchase_order_status_entry.get()
@@ -2467,6 +2833,13 @@ def supervisor_dashboard(username):
         messagebox.showinfo("Success", "Record successfully edited")
         add_to_incoming_stock_table()
         add_to_product_table()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def fetch_sale_order_stock_data():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -2482,6 +2855,33 @@ def supervisor_dashboard(username):
         outgoing_stock_tree.delete(*outgoing_stock_tree.get_children())
         for outgoing_stock in outgoing_stocks:
             outgoing_stock_tree.insert("", END, values=outgoing_stock)
+
+    def update_sales_order_status():
+        new_status = sales_order_status_entry.get()
+        selected = outgoing_stock_tree.focus()
+        if not selected:
+            messagebox.showerror("Error", "Please select a record to edit")
+            return
+        row = outgoing_stock_tree.item(selected)["values"]
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE SALE_ORDER SET SALE_ORDER_STATUS = ? WHERE SALE_ORDER_ID = ?",
+            (new_status, row[0]),
+        )
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", "Record successfully edited")
+        add_to_sale_order_table()
+        add_to_product_table()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
+
 
     def fetch_sale_order_last_id():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -2507,7 +2907,6 @@ def supervisor_dashboard(username):
 
         sale_order_window = customtkinter.CTk()
         sale_order_window.title("Product Details")
-        sale_order_window.geometry("1080x720")
 
         product_selection_frame = customtkinter.CTkFrame(
             master=sale_order_window, border_width=2
@@ -2517,10 +2916,19 @@ def supervisor_dashboard(username):
             master=sale_order_window
         )
 
+        def fetch_sale_order_status(sale_order_id):
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT SALE_ORDER_STATUS FROM SALE_ORDER WHERE SALE_ORDER_ID = ?", (sale_order_id,))
+            status = cursor.fetchone()
+            conn.close()
+            return status[0] if status else None
         def fetch_sale_order_product_data():
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM SALE_ORDER_PRODUCT WHERE SALE_ORDER_ID = ?", (values[0],))
+            cursor.execute(
+                "SELECT * FROM SALE_ORDER_PRODUCT WHERE SALE_ORDER_ID = ?", (values[0],)
+            )
             sale_order = cursor.fetchall()
             conn.commit()
             conn.close()
@@ -2537,6 +2945,11 @@ def supervisor_dashboard(username):
             sale_order_product = product_selection_entry.get()
             sale_order_product_quantity = sales_quantity_entry.get()
 
+            sale_order_status = fetch_sale_order_status(sale_order_id)
+            if sale_order_status != "To be Packed":
+                messagebox.showerror("Error", "Sale order status is not 'To be Packed'. Cannot add more products.")
+                return
+
             if not sale_order_product_quantity:
                 messagebox.showerror("Error", "Please enter all fields")
                 return
@@ -2544,47 +2957,104 @@ def supervisor_dashboard(username):
                 conn = sqlite3.connect("Inventory Management System.db")
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID,SALE_ORDER_PRODUCT,SALE_ORDER_PRODUCT_QUANTITY) \
-                VALUES (?,?,?)",
-                    (sale_order_id, sale_order_product, sale_order_product_quantity),
+                    "SELECT PRODUCT_QUANTITY FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,),
                 )
-                conn.commit()
-                conn.close()
-                messagebox.showinfo("Success", "Data has been inserted")
+                product_quantity = cursor.fetchone()[0]
+                if product_quantity < int(sale_order_product_quantity):
+                    messagebox.showerror("Error", "Insufficient quantity")
+                    return
+                else:
+                    conn = sqlite3.connect("Inventory Management System.db")
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID,SALE_ORDER_PRODUCT,SALE_ORDER_PRODUCT_QUANTITY) \
+                    VALUES (?,?,?)",
+                        (sale_order_id, sale_order_product, sale_order_product_quantity),
+                    )
+                    cursor.execute(
+                        "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY - ? WHERE PRODUCT_NAME = ?",
+                        (sale_order_product_quantity, sale_order_product),
+                    )
+                    conn.commit()
+                    conn.close()
+                    messagebox.showinfo("Success", "Data has been inserted")
             add_to_sale_order_product_table()
+            add_to_product_table()
+            update_low_stock_item_label()
             return
 
-        select_product_label = customtkinter.CTkLabel(product_selection_frame, text="Select Product",
-                                                       font=customtkinter.CTkFont("SF Pro Display", weight='bold',
-                                                                                  size=15))
+        select_product_label = customtkinter.CTkLabel(
+            product_selection_frame,
+            text="Select Product",
+            font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+        )
 
-        product_selection_label = customtkinter.CTkLabel(product_selection_frame, text="Product to be purchase:",
-                                                         font=customtkinter.CTkFont("SF Pro Display"))
-        product_selection_entry = customtkinter.CTkComboBox(master=product_selection_frame, values=fetch_product_to_list(),
-                                                            width=230,
-                                                            height=30, font=customtkinter.CTkFont("SF Pro Display"),
-                                                            border_width=0)
-        sales_quantity_label = customtkinter.CTkLabel(product_selection_frame, text="Purchase Quantity:",
-                                                      font=customtkinter.CTkFont("SF Pro Display"))
-        sales_quantity_entry = customtkinter.CTkEntry(master=product_selection_frame, placeholder_text="Quantity", width=230,
-                                                      height=30, font=customtkinter.CTkFont("SF Pro Display"),
-                                                      border_width=0)
-        sales_btn = customtkinter.CTkButton(master=product_selection_frame, text="Add Item",
-                                            command=add_sale_order_product, font=customtkinter.CTkFont("SF Pro Display"),
-                                            corner_radius=200, fg_color="#007FFF", text_color="black")
+        product_selection_label = customtkinter.CTkLabel(
+            product_selection_frame,
+            text="Product to be purchase:",
+            font=customtkinter.CTkFont("SF Pro Display"),
+        )
+        product_selection_entry = customtkinter.CTkComboBox(
+            master=product_selection_frame,
+            values=fetch_product_to_list(),
+            width=230,
+            height=30,
+            font=customtkinter.CTkFont("SF Pro Display"),
+            border_width=0,
+        )
+        sales_quantity_label = customtkinter.CTkLabel(
+            product_selection_frame,
+            text="Purchase Quantity:",
+            font=customtkinter.CTkFont("SF Pro Display"),
+        )
+        sales_quantity_entry = customtkinter.CTkEntry(
+            master=product_selection_frame,
+            placeholder_text="Quantity",
+            width=230,
+            height=30,
+            font=customtkinter.CTkFont("SF Pro Display"),
+            border_width=0,
+        )
+        sales_btn = customtkinter.CTkButton(
+            master=product_selection_frame,
+            text="Add Item",
+            command=add_sale_order_product,
+            font=customtkinter.CTkFont("SF Pro Display"),
+            corner_radius=200,
+            fg_color="#007FFF",
+            text_color="black",
+        )
 
         style1 = ThemedStyle()
         style1.set_theme("equilux")
-        style1.configure("Treeview", font=("SF Pro Display", 10), rowheight=24, foreground="white",
-                        background="#2a2d2e",
-                        fieldbackground="#343638", bordercolor="#343638", borderwidth=0)
-        style1.map('Treeview', background=[('selected', '#22559b')])
-        style1.configure("Treeview.Heading", background="#565b5e", foreground="white", relief="flat")
-        style1.map("Treeview.Heading", background=[('active', '#3484F0')])
-        style1.configure("DateEntry", font=customtkinter.CTkFont("SF Pro Display", 12), foreground="white",
-                        background="#2a2d2e", fieldbackground="#343638", bordercolor="#343638", borderwidth=0)
+        style1.configure(
+            "Treeview",
+            font=("SF Pro Display", 10),
+            rowheight=24,
+            foreground="white",
+            background="#2a2d2e",
+            fieldbackground="#343638",
+            bordercolor="#343638",
+            borderwidth=0,
+        )
+        style1.map("Treeview", background=[("selected", "#22559b")])
+        style1.configure(
+            "Treeview.Heading", background="#565b5e", foreground="white", relief="flat"
+        )
+        style1.map("Treeview.Heading", background=[("active", "#3484F0")])
+        style1.configure(
+            "DateEntry",
+            font=customtkinter.CTkFont("SF Pro Display", 12),
+            foreground="white",
+            background="#2a2d2e",
+            fieldbackground="#343638",
+            bordercolor="#343638",
+            borderwidth=0,
+        )
 
-        sale_order_product_tree = ttk.Treeview(master=sale_order_product_table_frame, height=30)
+        sale_order_product_tree = ttk.Treeview(
+            master=sale_order_product_table_frame, height=30
+        )
 
         sale_order_product_verscrlbar = customtkinter.CTkScrollbar(
             master=sale_order_product_table_frame,
@@ -2593,7 +3063,9 @@ def supervisor_dashboard(username):
         )
         sale_order_product_verscrlbar.pack(side="right", fill="y")
 
-        sale_order_product_tree.configure(yscrollcommand=sale_order_product_verscrlbar.set)
+        sale_order_product_tree.configure(
+            yscrollcommand=sale_order_product_verscrlbar.set
+        )
         sale_order_product_tree["columns"] = (
             "SALEORDERID",
             "SALEORDERPRODUCT",
@@ -2611,33 +3083,86 @@ def supervisor_dashboard(username):
 
         sale_order_product_tree.pack(side="bottom", fill="both")
 
-        product_selection_frame.grid(
-            row=0,column=0, padx=10, pady=10, sticky=NW
-        )
-        select_product_label.grid(
-            row=0,column=0, padx=10, pady=10
-        )
-        product_selection_label.grid(
-            row=1,column=0, padx=10, pady=10
-        )
-        product_selection_entry.grid(
-            row=1,column=1, padx=10, pady=10
-        )
-        sales_quantity_label.grid(
-            row=2,column=0, padx=10, pady=10
-        )
-        sales_quantity_entry.grid(
-            row=2,column=1, padx=10, pady=10
-        )
-        sales_btn.grid(
-            row=3,column=0, padx=10, pady=10, columnspan=2
-        )
-        sale_order_product_table_frame.grid(
-            row=0,column=1, padx=10, pady=10
-        )
+        product_selection_frame.grid(row=0, column=0, padx=10, pady=10, sticky=NW)
+        select_product_label.grid(row=0, column=0, padx=10, pady=10)
+        product_selection_label.grid(row=1, column=0, padx=10, pady=10)
+        product_selection_entry.grid(row=1, column=1, padx=10, pady=10)
+        sales_quantity_label.grid(row=2, column=0, padx=10, pady=10)
+        sales_quantity_entry.grid(row=2, column=1, padx=10, pady=10)
+        sales_btn.grid(row=3, column=0, padx=10, pady=10, columnspan=2)
+        sale_order_product_table_frame.grid(row=0, column=1, padx=10, pady=10)
 
         add_to_sale_order_product_table()
         sale_order_window.mainloop()
+
+    def low_stock_vs_total_item_pie_chart(canvas):
+        data=[]
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT WHERE PRODUCT_QUANTITY < PRODUCT_MIN_STOCK")
+        low_stock_items = cursor.fetchone()[0]
+        data.append(low_stock_items)
+        conn.commit()
+        conn.close()
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT")
+        total_items = cursor.fetchone()[0]
+        data.append(total_items - low_stock_items)
+        conn.commit()
+        conn.close()
+
+        fig = plt.Figure()
+        ax = fig.add_subplot(111)
+        fig.patch.set_facecolor('#e5e5e5')  # Set the figure background color
+        ax.set_facecolor('#e5e5e5')  # Set the axes background color
+        ax.axis("equal")
+
+        ax.pie(data, labels=["Low Stock", "In Stock"], autopct="%.2f%%", pctdistance=0.85)
+
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+        ax.add_artist(centre_circle)
+
+        canvas.figure = fig
+        canvas.draw()
+
+    def bar_chart(canvas):
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT PRODUCT_ID, PRODUCT_QUANTITY FROM PRODUCT")
+        data = cursor.fetchall()
+        conn.commit()
+        conn.close()
+
+        product_ids = [row[0] for row in data]
+        product_quantities = [row[1] for row in data]
+
+        fig1 = plt.Figure()
+        ax = fig1.add_subplot(111)
+        fig1.patch.set_facecolor('#e5e5e5')
+        ax.set_facecolor('#e5e5e5')
+        ax.bar(product_ids, product_quantities)
+        ax.tick_params(axis='x', labelsize=5)
+        ax.tick_params(axis='y', labelsize=10)
+        ax.set_xlabel('Product Name', fontsize=12)
+        ax.set_ylabel('Product Quantity', fontsize=12)
+        ax.set_title('Inventory', fontsize=14)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
+
+        canvas.figure = fig1
+        canvas.draw()
+
+
+    def sort_treeview_column(tv, col, reverse):
+        l = [(tv.set(k, col), k) for k in tv.get_children('')]
+        l.sort(reverse=reverse)
+
+        for index, (val, k) in enumerate(l):
+            tv.move(k, '', index)
+
+        tv.heading(col, command=lambda: sort_treeview_column(tv, col, not reverse))
 
     supervisor_dashboard_frame = customtkinter.CTkFrame(
         master=app, width=1280, height=720, border_width=0
@@ -2694,90 +3219,189 @@ def supervisor_dashboard(username):
     sales_activity_frame = customtkinter.CTkFrame(
         tab_0, corner_radius=10, border_width=2
     )
+
     sales_activity_title = customtkinter.CTkLabel(
         sales_activity_frame,
         text="Sales Activity",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
     )
-    total_tbs = customtkinter.CTkFrame(
-        master=sales_activity_frame, fg_color="transparent"
-    )
-    total_tbs_details_1 = customtkinter.CTkLabel(
-        master=total_tbs,
-        text="0 Qty",
-        font=customtkinter.CTkFont("SF Pro Display", size=13),
-    )
-    total_tbs_details_2 = customtkinter.CTkLabel(
-        master=total_tbs,
-        text="To be Shipped",
-        font=customtkinter.CTkFont("SF Pro Display", size=13),
-    )
-    sales_activity_vertical_separator = customtkinter.CTkFrame(
-        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
-    )
-    total_tbr = customtkinter.CTkFrame(
-        master=sales_activity_frame, width=100, height=100, fg_color="transparent"
-    )
-    total_tbr_details_1 = customtkinter.CTkLabel(
-        total_tbr, text="0 Qty", font=customtkinter.CTkFont("SF Pro Display", size=13)
-    )
-    total_tbr_details_2 = customtkinter.CTkLabel(
-        total_tbr,
-        text="To be Received",
+
+    total_to_be_packed_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_packed_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
 
-    inventory_summary_frame = customtkinter.CTkFrame(
-        tab_0, corner_radius=10, height=20090, border_width=2
+    total_to_be_packed_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Packed",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
+
+    sales_activity_vertical_separator_1 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    total_to_be_shipped_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_shipped_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    total_to_be_shipped_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Shipped",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_2 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    total_to_be_delivered_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_delivered_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    total_to_be_delivered_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Delivered",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_3 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    inventory_summary_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
     inventory_summary_title = customtkinter.CTkLabel(
         inventory_summary_frame,
         text="Inventory Summary",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
     )
-    total_in_hand_1 = customtkinter.CTkLabel(
+
+    total_quantity_in_hand_1 = customtkinter.CTkLabel(
         master=inventory_summary_frame,
-        text="Quantity in Hand",
+        text=str(fetch_total_quantity_in_hand_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    total_in_hand_2 = customtkinter.CTkLabel(
+
+    total_quantity_in_hand_2 = customtkinter.CTkLabel(
         master=inventory_summary_frame,
-        text="12345",
+        text="Quantity In Hand",
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    inventory_summary_horizontal_separator = customtkinter.CTkFrame(
-        inventory_summary_frame, width=200, height=2, fg_color="#CCCCCC"
+
+    sales_activity_vertical_separator_4 = customtkinter.CTkFrame(
+        inventory_summary_frame, width=2, height=50, fg_color="#CCCCCC"
     )
-    total_tobereceived_details_1 = customtkinter.CTkLabel(
-        inventory_summary_frame,
-        text="Quantity To Be Received",
+
+    total_quantity_to_be_received_1 = customtkinter.CTkLabel(
+        master=inventory_summary_frame,
+        text=str(fetch_total_quantity_to_be_received_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    total_tobereceived_details_2 = customtkinter.CTkLabel(
-        inventory_summary_frame,
-        text="100",
+
+    total_quantity_to_be_received_2 = customtkinter.CTkLabel(
+        master=inventory_summary_frame,
+        text="Quantity To be Received",
         font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_5 = customtkinter.CTkFrame(
+        inventory_summary_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    product_details_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
+    product_details_title = customtkinter.CTkLabel(
+        product_details_frame,
+        text="Product Details",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+    )
+
+    low_stock_items_1 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text=str(fetch_low_stock_item_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    low_stock_items_2 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text="Low Stock Items",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_6 = customtkinter.CTkFrame(
+        product_details_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    all_items_1 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text=str(fetch_total_items_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    all_items_2 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text="Total Items",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_7 = customtkinter.CTkFrame(
+        product_details_frame, width=2, height=50, fg_color="#CCCCCC"
     )
 
     welcome_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
-    sales_activity_frame.grid(row=1, column=0, sticky=W, padx=10, pady=10)
-    inventory_summary_frame.grid(row=1, column=1, sticky=W, padx=10, pady=10)
+    sales_activity_frame.grid(row=1, column=0, padx=10, pady=10)
+    inventory_summary_frame.grid(row=1, column=1, padx=10, pady=10)
+    product_details_frame.grid(row=1, column=2, padx=10, pady=10)
+    fig = plt.Figure()
+    fig.set_facecolor('#e5e5e5')
+    canvas = FigureCanvasTkAgg(fig, master=tab_0)
+    canvas.get_tk_widget().grid(row=2, column=0, padx=10, pady=10, columnspan=2, sticky="W")
+    low_stock_vs_total_item_pie_chart(canvas)
 
-    sales_activity_title.grid(row=0, column=0, sticky=W, padx=20, pady=10)
-    total_tbs.grid(row=1, column=0, sticky=W, padx=40, pady=(20, 40))
-    total_tbs_details_1.pack(side=TOP)
-    total_tbs_details_2.pack(side=BOTTOM)
-    sales_activity_vertical_separator.grid(row=1, column=1)
-    total_tbr.grid(row=1, column=2, sticky=W, padx=40, pady=(20, 40))
-    total_tbr_details_1.pack(side=TOP)
-    total_tbr_details_2.pack(side=BOTTOM)
+    fig1 = plt.Figure()
+    fig1.set_facecolor('#e5e5e5')
+    canvas1 = FigureCanvasTkAgg(fig1, master=tab_0)
+    canvas1.get_tk_widget().grid(row=2, column=1, padx=10, pady=10, columnspan=2)
+    bar_chart(canvas1)
 
-    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
-    total_in_hand_1.grid(row=1, column=0, sticky=W, padx=10, pady=(0, 10))
-    total_in_hand_2.grid(row=1, column=1, sticky=W, padx=10, pady=(0, 10))
-    inventory_summary_horizontal_separator.grid(row=2, column=0, columnspan=2)
-    total_tobereceived_details_1.grid(row=3, column=0, sticky=W, padx=10, pady=(10, 10))
-    total_tobereceived_details_2.grid(row=3, column=1, sticky=W, padx=10, pady=(10, 10))
+    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    total_to_be_packed_label_1.grid(row=1, column=0, padx=20, pady=5)
+    total_to_be_packed_label_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    total_to_be_shipped_label_1.grid(row=1, column=2, padx=20, pady=5)
+    total_to_be_shipped_label_2.grid(row=2, column=2, padx=20, pady=5)
+    sales_activity_vertical_separator_2.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+    total_to_be_delivered_label_1.grid(row=1, column=4, padx=20, pady=5)
+    total_to_be_delivered_label_2.grid(row=2, column=4, padx=20, pady=5)
+    # sales_activity_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
+
+    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    total_quantity_in_hand_1.grid(row=1, column=0, padx=20, pady=5)
+    total_quantity_in_hand_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_4.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    total_quantity_to_be_received_1.grid(row=1, column=2, padx=20, pady=5)
+    total_quantity_to_be_received_2.grid(row=2, column=2, padx=20, pady=5)
+    # sales_activity_vertical_separator_5.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+
+    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    low_stock_items_1.grid(row=1, column=0, padx=20, pady=5)
+    low_stock_items_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_6.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    all_items_1.grid(row=1, column=2, padx=20, pady=5)
+    all_items_2.grid(row=2, column=2, padx=20, pady=5)
+    # sales_activity_vertical_separator_7.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+
+    tab_0.columnconfigure(1, weight=1)
 
     customer_table_frame = customtkinter.CTkFrame(master=tab_1, width=1280, height=515)
     customer_table_frame.place(x=0, y=205)
@@ -2812,13 +3436,25 @@ def supervisor_dashboard(username):
     customer_tree.bind("<Double-1>", on_customer_double_click)
     customer_tree.bind("<ButtonRelease>", display_customer_record)
 
-    insert_customer_data_label = customtkinter.CTkLabel(
+    customer_menu_frame = customtkinter.CTkFrame(
         master=tab_1,
+        border_width=2
+    )
+
+    insert_customer_data_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
         text="Insert New Customer",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
+
+    customer_name_entry_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
+        text="Customer Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     customer_name_entry = customtkinter.CTkEntry(
-        master=tab_1,
+        master=customer_menu_frame,
         placeholder_text="Name",
         width=230,
         height=30,
@@ -2826,8 +3462,14 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    customer_email_entry_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
+        text="Customer Email Address:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     customer_email_entry = customtkinter.CTkEntry(
-        master=tab_1,
+        master=customer_menu_frame,
         placeholder_text="Email Address",
         width=230,
         height=30,
@@ -2835,8 +3477,14 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    customer_contact_entry_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
+        text="Customer Contact No.:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     customer_contact_entry = customtkinter.CTkEntry(
-        master=tab_1,
+        master=customer_menu_frame,
         placeholder_text="Contact No.",
         width=230,
         height=30,
@@ -2844,12 +3492,8 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
-    horizontal_separator = customtkinter.CTkFrame(
-        tab_1, width=1000, height=2, fg_color="#CCCCCC"
-    )
-
     addcustomer_btn = customtkinter.CTkButton(
-        master=tab_1,
+        master=customer_menu_frame,
         text="Add",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_customer_details,
@@ -2860,7 +3504,7 @@ def supervisor_dashboard(username):
     )
 
     editcustomer_btn = customtkinter.CTkButton(
-        master=tab_1,
+        master=customer_menu_frame,
         text="Edit",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_customer_details,
@@ -2871,7 +3515,7 @@ def supervisor_dashboard(username):
     )
 
     deletecustomer_btn = customtkinter.CTkButton(
-        master=tab_1,
+        master=customer_menu_frame,
         text="Delete",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_customer_record,
@@ -2881,13 +3525,22 @@ def supervisor_dashboard(username):
         text_color="black",
     )
 
-    insert_customer_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    customer_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    customer_email_entry.grid(row=1, column=1, padx=5, pady=5)
-    customer_contact_entry.grid(row=1, column=2, padx=5, pady=5)
-    addcustomer_btn.grid(row=2, column=3, padx=20, pady=80)
-    editcustomer_btn.grid(row=2, column=4, padx=20, pady=80)
-    deletecustomer_btn.grid(row=2, column=5, padx=20, pady=80)
+    customer_menu_frame.grid(row=0, column=0)
+
+    insert_customer_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
+
+    customer_name_entry_label.grid(row=1, column=0, padx=5, pady=5)
+    customer_name_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+    customer_email_entry_label.grid(row=1, column=2, padx=5, pady=5)
+    customer_email_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+    customer_contact_entry_label.grid(row=1, column=4, padx=5, pady=5)
+    customer_contact_entry.grid(row=1, column=5, padx=5, pady=5, sticky="w")
+
+    addcustomer_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+    editcustomer_btn.grid(row=2, column=2, padx=5, pady=5, columnspan=2)
+    deletecustomer_btn.grid(row=2, column=4, padx=5, pady=5, columnspan=2)
+
+    tab_1.columnconfigure(0, weight=2)
 
     supplier_table_frame = customtkinter.CTkFrame(master=tab_2, width=1280, height=515)
     supplier_table_frame.place(x=0, y=205)
@@ -2921,13 +3574,25 @@ def supervisor_dashboard(username):
     supplier_tree.pack(side="right", fill="both")
     supplier_tree.bind("<ButtonRelease>", display_supplier_record)
 
-    insert_supplier_data_label = customtkinter.CTkLabel(
+    supplier_menu_frame = customtkinter.CTkFrame(
         master=tab_2,
+        border_width=2
+    )
+
+    insert_supplier_data_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
         text="Insert New Supplier",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
+
+    supplier_name_entry_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
+        text="Supplier Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     supplier_name_entry = customtkinter.CTkEntry(
-        master=tab_2,
+        master=supplier_menu_frame,
         placeholder_text="Name",
         width=230,
         height=30,
@@ -2935,8 +3600,14 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    supplier_email_entry_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
+        text="Supplier Email Address:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     supplier_email_entry = customtkinter.CTkEntry(
-        master=tab_2,
+        master=supplier_menu_frame,
         placeholder_text="Email Address",
         width=230,
         height=30,
@@ -2944,8 +3615,14 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    supplier_contact_entry_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
+        text="Supplier Contact No.:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     supplier_contact_entry = customtkinter.CTkEntry(
-        master=tab_2,
+        master=supplier_menu_frame,
         placeholder_text="Contact No.",
         width=230,
         height=30,
@@ -2954,9 +3631,9 @@ def supervisor_dashboard(username):
     )
 
     addsupplier_btn = customtkinter.CTkButton(
-        master=tab_2,
+        master=supplier_menu_frame,
         text="Add",
-        font=customtkinter.CTkFont(("SF Pro Display")),
+        font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_supplier_details,
         compound="top",
         corner_radius=200,
@@ -2965,9 +3642,9 @@ def supervisor_dashboard(username):
     )
 
     editsupplier_btn = customtkinter.CTkButton(
-        master=tab_2,
+        master=supplier_menu_frame,
         text="Edit",
-        font=customtkinter.CTkFont(("SF Pro Display")),
+        font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_supplier_details,
         compound="top",
         corner_radius=200,
@@ -2976,9 +3653,9 @@ def supervisor_dashboard(username):
     )
 
     deletesupplier_btn = customtkinter.CTkButton(
-        master=tab_2,
+        master=supplier_menu_frame,
         text="Delete",
-        font=customtkinter.CTkFont(("SF Pro Display")),
+        font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_supplier_record,
         compound="top",
         corner_radius=200,
@@ -2986,13 +3663,22 @@ def supervisor_dashboard(username):
         text_color="black",
     )
 
-    insert_supplier_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    supplier_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    supplier_email_entry.grid(row=1, column=1, padx=5, pady=5)
-    supplier_contact_entry.grid(row=1, column=2, padx=5, pady=5)
-    addsupplier_btn.grid(row=2, column=3, padx=20, pady=80)
-    editsupplier_btn.grid(row=2, column=4, padx=20, pady=80)
-    deletesupplier_btn.grid(row=2, column=5, padx=20, pady=80)
+    supplier_menu_frame.grid(row=0, column=0)
+
+    insert_supplier_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
+
+    supplier_name_entry_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    supplier_name_entry.grid(row=1, column=1, padx=5, pady=5)
+    supplier_email_entry_label.grid(row=1, column=2, sticky="w", padx=5, pady=5)
+    supplier_email_entry.grid(row=1, column=3, padx=5, pady=5)
+    supplier_contact_entry_label.grid(row=1, column=4, sticky="w", padx=5, pady=5)
+    supplier_contact_entry.grid(row=1, column=5, padx=5, pady=5)
+
+    addsupplier_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+    editsupplier_btn.grid(row=2, column=2, padx=5, pady=5, columnspan=2)
+    deletesupplier_btn.grid(row=2, column=4, padx=5, pady=5, columnspan=2)
+
+    tab_2.columnconfigure(0, weight=2)
 
     product_table_frame = customtkinter.CTkFrame(master=tab_3, width=1280, height=515)
     product_table_frame.place(x=0, y=205)
@@ -3010,30 +3696,64 @@ def supervisor_dashboard(username):
         "PRODUCTNAME",
         "PRODUCTQUANTITY",
         "PRODUCTDESCRIPTION",
+        "PRODUCTMINSTOCK",
     )
 
     product_tree.column("#0", width=0, stretch=tk.NO)
-    product_tree.column("PRODUCTID", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTNAME", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTQUANTITY", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTDESCRIPTION", anchor=tk.CENTER, width=313)
+    product_tree.column("PRODUCTID", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTNAME", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTQUANTITY", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTDESCRIPTION", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTMINSTOCK", anchor=tk.CENTER, width=250)
 
-    product_tree.heading("PRODUCTID", text="ID")
+    product_tree.heading("PRODUCTID", text="ID", command=lambda: sort_treeview_column(product_tree, "PRODUCTID", False))
     product_tree.heading("PRODUCTNAME", text="Name")
     product_tree.heading("PRODUCTQUANTITY", text="Quantity")
     product_tree.heading("PRODUCTDESCRIPTION", text="Description")
+    product_tree.heading("PRODUCTMINSTOCK", text="Min. Stock")
 
     product_tree.pack(side="bottom", fill="both")
     product_tree.bind("<Double-1>", on_product_double_click)
     product_tree.bind("<ButtonRelease>", display_product_record)
 
-    insert_product_data_label = customtkinter.CTkLabel(
+    search_entry = customtkinter.CTkEntry(tab_3,placeholder_text="Search", width=1050,)
+    search_entry.grid(row=1,column=0, padx=10, pady=10)
+    search_entry.bind("<KeyRelease>", search_product)
+
+    product_menu_frame = customtkinter.CTkFrame(
         master=tab_3,
+        border_width=2
+    )
+
+    insert_product_data_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
         text="Insert New Product",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
+
+    product_id_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product ID:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_id_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="ID",
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+
+    product_name_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_name_entry = customtkinter.CTkEntry(
-        master=tab_3,
+        master=product_menu_frame,
         placeholder_text="Item",
         width=230,
         height=30,
@@ -3041,8 +3761,14 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    product_quantity_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Quantity:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_quantity_entry = customtkinter.CTkEntry(
-        master=tab_3,
+        master=product_menu_frame,
         placeholder_text="Quantity",
         width=230,
         height=30,
@@ -3050,8 +3776,14 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    product_description_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Description:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_description_entry = customtkinter.CTkEntry(
-        master=tab_3,
+        master=product_menu_frame,
         placeholder_text="Description",
         width=230,
         height=30,
@@ -3059,8 +3791,23 @@ def supervisor_dashboard(username):
         border_width=0,
     )
 
+    product_min_stock_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Min. Stock:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_min_stock_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="Min. Stock",
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+
     addproduct_btn = customtkinter.CTkButton(
-        master=tab_3,
+        master=product_menu_frame,
         text="Add Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_product_details,
@@ -3071,7 +3818,7 @@ def supervisor_dashboard(username):
     )
 
     editproduct_btn = customtkinter.CTkButton(
-        master=tab_3,
+        master=product_menu_frame,
         text="Edit Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_product_details,
@@ -3082,7 +3829,7 @@ def supervisor_dashboard(username):
     )
 
     deleteproduct_btn = customtkinter.CTkButton(
-        master=tab_3,
+        master=product_menu_frame,
         text="Delete Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_product_record,
@@ -3092,13 +3839,28 @@ def supervisor_dashboard(username):
         text_color="black",
     )
 
-    insert_product_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    product_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    product_quantity_entry.grid(row=1, column=1, padx=5, pady=5)
-    product_description_entry.grid(row=1, column=2, padx=5, pady=5)
-    addproduct_btn.grid(row=2, column=3, padx=20, pady=80)
-    editproduct_btn.grid(row=2, column=4, padx=20, pady=80)
-    deleteproduct_btn.grid(row=2, column=5, padx=20, pady=80)
+    product_menu_frame.grid(row=0, column=0)
+
+    insert_product_data_label.grid(
+        row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2
+    )
+
+    product_id_entry_label.grid(row=1, column=0, padx=5)
+    product_id_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    product_name_entry_label.grid(row=1, column=2, padx=5)
+    product_name_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+    product_quantity_entry_label.grid(row=1, column=4, padx=5)
+    product_quantity_entry.grid(row=1, column=5, padx=5, pady=5, sticky="w")
+    product_description_entry_label.grid(row=2, column=0, padx=5)
+    product_description_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+    product_min_stock_entry_label.grid(row=2, column=2, padx=5)
+    product_min_stock_entry.grid(row=2, column=3, padx=5, pady=5)
+
+    addproduct_btn.grid(row=3, column=0, padx=20, pady=5, columnspan=2)
+    editproduct_btn.grid(row=3, column=2, padx=20, pady=5, columnspan=2)
+    deleteproduct_btn.grid(row=3, column=4, padx=20, pady=5, columnspan=2)
+
+    tab_3.columnconfigure(0, weight=2)
 
     task_table_frame = customtkinter.CTkFrame(master=tab_4, width=1280, height=515)
     task_table_frame.place(x=0, y=220)
@@ -3111,14 +3873,22 @@ def supervisor_dashboard(username):
     task_verscrlbar.pack(side="right", fill="y")
 
     task_tree.configure(yscrollcommand=task_verscrlbar.set)
-    task_tree["columns"] = ("TASKDESCRIPTION", "ASSIGNEDTO", "STATUS","DUEDATE")
+    task_tree["columns"] = (
+        "TASKID",
+        "TASKDESCRIPTION",
+        "ASSIGNEDTO",
+        "STATUS",
+        "DUEDATE",
+    )
 
     task_tree.column("#0", width=0, stretch=tk.NO)
-    task_tree.column("TASKDESCRIPTION", anchor=tk.CENTER, width=310)
-    task_tree.column("ASSIGNEDTO", anchor=tk.CENTER, width=310)
-    task_tree.column("STATUS", anchor=tk.CENTER, width=310)
-    task_tree.column("DUEDATE", anchor=tk.CENTER, width=320)
+    task_tree.column("TASKID", anchor=tk.CENTER, width=250)
+    task_tree.column("TASKDESCRIPTION", anchor=tk.CENTER, width=250)
+    task_tree.column("ASSIGNEDTO", anchor=tk.CENTER, width=250)
+    task_tree.column("STATUS", anchor=tk.CENTER, width=250)
+    task_tree.column("DUEDATE", anchor=tk.CENTER, width=250)
 
+    task_tree.heading("TASKID", text="Task ID")
     task_tree.heading("TASKDESCRIPTION", text="Task")
     task_tree.heading("ASSIGNEDTO", text="Assigned To")
     task_tree.heading("STATUS", text="Status")
@@ -3131,10 +3901,7 @@ def supervisor_dashboard(username):
     task_tree.tag_configure("Completed", background="green", foreground="black")
     task_tree.tag_configure("Due", background="#FF7F7F", foreground="black")
 
-
-    task_menu_frame = customtkinter.CTkFrame(
-        master=tab_4, border_width=2
-    )
+    task_menu_frame = customtkinter.CTkFrame(master=tab_4, border_width=2)
     insert_task_data_label = customtkinter.CTkLabel(
         master=task_menu_frame,
         text="Assign New Task",
@@ -3217,41 +3984,18 @@ def supervisor_dashboard(username):
         text_color="black",
     )
 
-    task_menu_frame.grid(
-        row=0, column=0
-    )
-    insert_task_data_label.grid(
-        row=0, column=0, sticky=W, padx=10, pady=10
-    )
-    task_label.grid(
-        row=1, column=0, padx=5, pady=5
-    )
-    task_entry.grid(
-        row=1, column=1, padx=5, pady=5
-    )
-    assigned_worker_label.grid(
-        row=2, column=0, padx=5, pady=5
-    )
-    assigned_worker_entry.grid(
-        row=2, column=1, padx=5, pady=5
-    )
-    task_due_date_label.grid(
-        row=3, column=0, padx=5, pady=5
-    )
-    task_due_date_entry.grid(
-        row=3, column=1, padx=5, pady=5
-    )
-    addtask_btn.grid(
-        row=4, column=0, padx=5, pady=5
-    )
-    edittask_btn.grid(
-        row=4, column=1, padx=5, pady=5
-    )
-    deletetask_btn.grid(
-        row=4, column=2,padx=5, pady=5
-    )
+    task_menu_frame.grid(row=0, column=0)
+    insert_task_data_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+    task_label.grid(row=1, column=0, padx=5, pady=5)
+    task_entry.grid(row=1, column=1, padx=5, pady=5)
+    assigned_worker_label.grid(row=2, column=0, padx=5, pady=5)
+    assigned_worker_entry.grid(row=2, column=1, padx=5, pady=5)
+    task_due_date_label.grid(row=3, column=0, padx=5, pady=5)
+    task_due_date_entry.grid(row=3, column=1, padx=5, pady=5)
+    addtask_btn.grid(row=4, column=0, padx=5, pady=5)
+    edittask_btn.grid(row=4, column=1, padx=5, pady=5)
+    deletetask_btn.grid(row=4, column=2, padx=5, pady=5)
 
-    tab_4.columnconfigure(0, weight=1)
     tab_4.columnconfigure(0, weight=1)
 
     incoming_stock_table_frame = customtkinter.CTkFrame(
@@ -3289,12 +4033,14 @@ def supervisor_dashboard(username):
 
     incoming_stock_tree.pack(side="bottom", fill="both")
 
-    incoming_stock_tree.tag_configure("To be Received", background="#FFBA00", foreground="black")
-    incoming_stock_tree.tag_configure("Received", background="green", foreground="black")
-
-    incoming_stock_menu_frame = customtkinter.CTkFrame(
-        master=tab_5, border_width=2
+    incoming_stock_tree.tag_configure(
+        "To be Received", background="#FFBA00", foreground="black"
     )
+    incoming_stock_tree.tag_configure(
+        "Received", background="green", foreground="black"
+    )
+
+    incoming_stock_menu_frame = customtkinter.CTkFrame(master=tab_5, border_width=2)
 
     edit_purchase_order_status_label = customtkinter.CTkLabel(
         master=incoming_stock_menu_frame,
@@ -3314,38 +4060,31 @@ def supervisor_dashboard(username):
         font=customtkinter.CTkFont("SF Pro Display"),
         border_width=0,
     )
-    editpurchaseorder_btn = customtkinter.CTkButton(master=incoming_stock_menu_frame, text="Edit Status",
-                                              font=customtkinter.CTkFont("SF Pro Display"),
-                                              command=update_purchase_order_status,
-                                              compound='top', corner_radius=200, fg_color="#007FFF", text_color="black")
-
-    incoming_stock_menu_frame.grid(
-        row=0, column=0,pady=10
-    )
-    edit_purchase_order_status_label.grid(
-        row=0, column=0, padx=10, pady=10
-    )
-    purchase_order_status_label.grid(
-        row=1, column=0, padx=5, pady=5
-    )
-    purchase_order_status_entry.grid(
-        row=1, column=1, padx=5, pady=5
-    )
-    editpurchaseorder_btn.grid(
-        row=2, column=0, padx=5, pady=5,columnspan=2
+    editpurchaseorder_btn = customtkinter.CTkButton(
+        master=incoming_stock_menu_frame,
+        text="Edit Status",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=update_purchase_order_status,
+        compound="top",
+        corner_radius=200,
+        fg_color="#007FFF",
+        text_color="black",
     )
 
-    tab_5.columnconfigure(0, weight=1)
-    tab_5.columnconfigure(0, weight=1)
+    incoming_stock_menu_frame.grid(row=0, column=0, pady=10)
+    edit_purchase_order_status_label.grid(row=0, column=0, padx=10, pady=10)
+    purchase_order_status_label.grid(row=1, column=0, padx=5, pady=5)
+    purchase_order_status_entry.grid(row=1, column=1, padx=5, pady=5)
+    editpurchaseorder_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
 
-
+    tab_5.columnconfigure(0, weight=2)
 
     outgoing_stock_table_frame = customtkinter.CTkFrame(
         master=tab_6, width=1006, height=515
     )
-    outgoing_stock_table_frame.place(x=0, y=0)
+    outgoing_stock_table_frame.place(x=0, y=205)
 
-    outgoing_stock_tree = ttk.Treeview(master=outgoing_stock_table_frame, height=30)
+    outgoing_stock_tree = ttk.Treeview(master=outgoing_stock_table_frame, height=20)
 
     outgoing_stock_verscrlbar = customtkinter.CTkScrollbar(
         master=outgoing_stock_table_frame,
@@ -3359,20 +4098,62 @@ def supervisor_dashboard(username):
         "OUTGOINGSTOCKID",
         "OUTGOINGSTOCKNAME",
         "OUTGOINGSTOCKQUANTITY",
+        "OUTGOINGSTOCKSTATUS"
     )
 
     outgoing_stock_tree.column("#0", width=0, stretch=tk.NO)
-    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=418)
-    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=418)
-    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=418)
+    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKSTATUS", anchor=tk.CENTER, width=313)
 
     outgoing_stock_tree.heading("OUTGOINGSTOCKID", text="ID")
     outgoing_stock_tree.heading("OUTGOINGSTOCKNAME", text="Date Created")
     outgoing_stock_tree.heading("OUTGOINGSTOCKQUANTITY", text="Customer Name")
+    outgoing_stock_tree.heading("OUTGOINGSTOCKSTATUS", text="Status")
 
     outgoing_stock_tree.pack(side="bottom", fill="both")
 
     outgoing_stock_tree.bind("<Double-1>", on_sale_order_double_click)
+
+    outgoing_stock_menu_frame = customtkinter.CTkFrame(master=tab_6, border_width=2)
+
+    edit_sales_order_status_label = customtkinter.CTkLabel(
+        master=outgoing_stock_menu_frame,
+        text="Edit Sales Order Status",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
+    )
+    sales_order_status_label = customtkinter.CTkLabel(
+        master=outgoing_stock_menu_frame,
+        text="Status:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+    sales_order_status_entry = customtkinter.CTkComboBox(
+        master=outgoing_stock_menu_frame,
+        values=["To be Packed", "To be Shipped", "To be Delivered", "Delivered"],
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+    editsalesorder_btn = customtkinter.CTkButton(
+        master=outgoing_stock_menu_frame,
+        text="Edit Status",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=update_sales_order_status,
+        compound="top",
+        corner_radius=200,
+        fg_color="#007FFF",
+        text_color="black",
+    )
+
+    outgoing_stock_menu_frame.grid(row=0, column=0, pady=10)
+    edit_sales_order_status_label.grid(row=0, column=0, padx=10, pady=10)
+    sales_order_status_label.grid(row=1, column=0, padx=5, pady=5)
+    sales_order_status_entry.grid(row=1, column=1, padx=5, pady=5)
+    editsalesorder_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+
+    tab_6.columnconfigure(0, weight=2)
 
     add_to_customer_table()
     add_to_supplier_table()
@@ -3383,6 +4164,103 @@ def supervisor_dashboard(username):
 
 
 def worker_dashboard(username):
+
+    def fetch_to_be_packed_data():
+        total_to_be_packed = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Packed",))
+        to_be_packed_data = cursor.fetchone()[0]
+        total_to_be_packed += to_be_packed_data
+        conn.commit()
+        conn.close()
+        return total_to_be_packed
+
+    def update_to_be_packed_label():
+        new_count = fetch_to_be_packed_data()
+        total_to_be_packed_label_1.configure(text=str(new_count))
+
+    def fetch_to_be_shipped_data():
+        total_to_be_shipped = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Shipped",))
+        to_be_shipped_data = cursor.fetchone()[0]
+        total_to_be_shipped += to_be_shipped_data
+        conn.commit()
+        conn.close()
+        return total_to_be_shipped
+
+    def update_to_be_shipped_label():
+        new_count = fetch_to_be_shipped_data()
+        total_to_be_shipped_label_1.configure(text=str(new_count))
+
+    def fetch_to_be_delivered_data():
+        total_to_be_delivered = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Delivered",))
+        to_be_delivered_data = cursor.fetchone()[0]
+        total_to_be_delivered += to_be_delivered_data
+        conn.commit()
+        conn.close()
+        return total_to_be_delivered
+
+    def update_to_be_delivered_label():
+        new_count = fetch_to_be_delivered_data()
+        total_to_be_delivered_label_1.configure(text=str(new_count))
+
+    def fetch_total_quantity_in_hand_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(PRODUCT_QUANTITY) FROM PRODUCT")
+        total_quantity_in_hand = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_quantity_in_hand
+
+    def update_total_quantity_in_hand_label():
+        new_count = fetch_total_quantity_in_hand_data()
+        total_quantity_in_hand_1.configure(text=str(new_count))
+
+    def fetch_total_quantity_to_be_received_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?", ("To be Received",))
+        total_quantity_to_be_received = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_quantity_to_be_received
+
+    def update_total_quantity_to_be_received_label():
+        new_count = fetch_total_quantity_to_be_received_data()
+        total_quantity_to_be_received_1.configure(text=str(new_count))
+
+    def fetch_low_stock_item_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT WHERE PRODUCT_QUANTITY < PRODUCT_MIN_STOCK")
+        low_stock_items = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return low_stock_items
+
+    def update_low_stock_item_label():
+        new_count = fetch_low_stock_item_data()
+        low_stock_items_1.configure(text=str(new_count))
+
+    def fetch_total_items_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT")
+        total_items = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return total_items
+
+    def update_total_items_label():
+        new_count = fetch_total_items_data()
+        all_items_1.configure(text=str(new_count))
     def fetch_customer_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -3406,6 +4284,24 @@ def worker_dashboard(username):
             customer_email_entry.insert(0, row[2])
             customer_contact_entry.insert(0, row[3])
 
+    def fetch_customer_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(CUSTOMER_ID) FROM CUSTOMER")
+        last_customer_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_customer_id
+
+    def generate_customer_id(prefix="CUST"):
+        last_customer_id = fetch_customer_last_id()
+        if last_customer_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def add_to_customer_table():
         customers = fetch_customer_data()
         customer_tree.delete(*customer_tree.get_children())
@@ -3424,7 +4320,15 @@ def worker_dashboard(username):
         conn.close()
         return existing_customer
 
+    def is_valid_email(email):
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email)
+
+    def is_valid_contact_number(contact_number):
+        return contact_number.isdigit()
+
     def add_new_customer_details():
+        customer_id = generate_customer_id("CUST")
         customer_name = customer_name_entry.get()
         customer_email = customer_email_entry.get()
         customer_contactno = customer_contact_entry.get()
@@ -3432,13 +4336,22 @@ def worker_dashboard(username):
         if not (customer_name and customer_email and customer_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        elif not check_existing_customer(customer_name):
+
+        if not is_valid_email(customer_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(customer_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        if not check_existing_customer(customer_name):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO CUSTOMER (CUSTOMER_NAME,CUSTOMER_EMAIL,CUSTOMER_TEL) \
-            VALUES (?,?,?)",
-                (customer_name, customer_email, customer_contactno),
+                "INSERT INTO CUSTOMER (CUSTOMER_ID,CUSTOMER_NAME,CUSTOMER_EMAIL,CUSTOMER_TEL) \
+                VALUES (?,?,?,?)",
+                (customer_id, customer_name, customer_email, customer_contactno),
             )
             conn.commit()
             conn.close()
@@ -3456,23 +4369,33 @@ def worker_dashboard(username):
         if not selected_customer_details:
             messagebox.showerror("Error", "Please select a record to edit")
             return
+
         row = customer_tree.item(selected_customer_details)["values"]
         new_customer_name = customer_name_entry.get()
         new_customer_email = customer_email_entry.get()
         new_customer_contactno = customer_contact_entry.get()
-        if not new_customer_name:
+
+        if not (new_customer_name and new_customer_email and new_customer_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        else:
-            conn = sqlite3.connect("Inventory Management System.db")
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE CUSTOMER SET CUSTOMER_NAME = ?, CUSTOMER_EMAIL = ?, CUSTOMER_TEL = ? WHERE CUSTOMER_NAME = ?",
-                (new_customer_name, new_customer_email, new_customer_contactno, row[1]),
-            )
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", "Record successfully edited")
+
+        if not is_valid_email(new_customer_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(new_customer_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE CUSTOMER SET CUSTOMER_NAME = ?, CUSTOMER_EMAIL = ?, CUSTOMER_TEL = ? WHERE CUSTOMER_NAME = ?",
+            (new_customer_name, new_customer_email, new_customer_contactno, row[1]),
+        )
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", "Record successfully edited")
         add_to_customer_table()
         clear_customer_entry_field()
 
@@ -3536,9 +4459,9 @@ def worker_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO SALE_ORDER (SALE_ORDER_ID,SALE_ORDER_DATE,SALE_ORDER_CUSTOMER) \
-            VALUES (?,?,?)",
-                (sale_order_id, sale_order_date, customer_name),
+                "INSERT INTO SALE_ORDER (SALE_ORDER_ID,SALE_ORDER_DATE,SALE_ORDER_CUSTOMER,SALE_ORDER_STATUS) \
+            VALUES (?,?,?,?)",
+                (sale_order_id, sale_order_date, customer_name, "To be packed"),
             )
             conn.commit()
             conn.close()
@@ -3548,7 +4471,6 @@ def worker_dashboard(username):
 
         sales_window = customtkinter.CTk()
         sales_window.title("Product Details")
-        sales_window.geometry("470x370")
 
         customer_id_label = customtkinter.CTkLabel(
             sales_window,
@@ -3685,6 +4607,24 @@ def worker_dashboard(username):
             supplier_email_entry.insert(0, row[2])
             supplier_contact_entry.insert(0, row[3])
 
+    def fetch_supplier_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(SUPPLIER_ID ) FROM SUPPLIER")
+        last_supplier_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_supplier_id
+
+    def generate_supplier_id(prefix="SUPP"):
+        last_supplier_id = fetch_supplier_last_id()
+        if last_supplier_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_supplier_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def check_existing_supplier(supplier_check):
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -3698,6 +4638,7 @@ def worker_dashboard(username):
         return existing_supplier
 
     def add_new_supplier_details():
+        supplier_id = generate_supplier_id("SUPP")
         supplier_name = supplier_name_entry.get()
         supplier_email = supplier_email_entry.get()
         supplier_contactno = supplier_contact_entry.get()
@@ -3705,21 +4646,31 @@ def worker_dashboard(username):
         if not (supplier_name and supplier_email and supplier_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        elif not check_existing_supplier(supplier_name):
+
+        if not is_valid_email(supplier_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(supplier_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        if not check_existing_supplier(supplier_name):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO SUPPLIER (SUPPLIER_NAME,SUPPLIER_EMAIL,SUPPLIER_TEL) \
-            VALUES (?,?,?)",
-                (supplier_name, supplier_name, supplier_contactno),
+                "INSERT INTO SUPPLIER (SUPPLIER_ID,SUPPLIER_NAME,SUPPLIER_EMAIL,SUPPLIER_TEL) \
+                VALUES (?,?,?,?)",
+                (supplier_id, supplier_name, supplier_email, supplier_contactno),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Success", "Data has been inserted")
         else:
             messagebox.showerror(
-                "Warning", "Duplicate customer! Please enter new customer."
+                "Warning", "Duplicate supplier! Please enter new supplier."
             )
+
         add_to_supplier_table()
         clear_supplier_entry_field()
         return
@@ -3729,23 +4680,34 @@ def worker_dashboard(username):
         if not selected_supplier_details:
             messagebox.showerror("Error", "Please select a record to edit")
             return
+
         row = supplier_tree.item(selected_supplier_details)["values"]
         new_supplier_name = supplier_name_entry.get()
         new_supplier_email = supplier_email_entry.get()
         new_supplier_contactno = supplier_contact_entry.get()
-        if not new_supplier_name:
+
+        if not (new_supplier_name and new_supplier_email and new_supplier_contactno):
             messagebox.showerror("Error", "Please enter all fields")
             return
-        else:
-            conn = sqlite3.connect("Inventory Management System.db")
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE SUPPLIER SET SUPPLIER_NAME = ?, SUPPLIER_EMAIL = ?, SUPPLIER_TEL = ? WHERE SUPPLIER_NAME = ?",
-                (new_supplier_name, new_supplier_email, new_supplier_contactno, row[1]),
-            )
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", "Record successfully edited")
+
+        if not is_valid_email(new_supplier_email):
+            messagebox.showerror("Error", "Please enter a valid email address")
+            return
+
+        if not is_valid_contact_number(new_supplier_contactno):
+            messagebox.showerror("Error", "Contact number must be only digits")
+            return
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE SUPPLIER SET SUPPLIER_NAME = ?, SUPPLIER_EMAIL = ?, SUPPLIER_TEL = ? WHERE SUPPLIER_NAME = ?",
+            (new_supplier_name, new_supplier_email, new_supplier_contactno, row[1]),
+        )
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", "Record successfully edited")
+
         add_to_supplier_table()
         clear_supplier_entry_field()
 
@@ -3789,18 +4751,22 @@ def worker_dashboard(username):
             product_tree.insert("", END, values=product)
 
     def clear_product_entry_field():
+        product_id_entry.delete(0, END)
         product_name_entry.delete(0, END)
         product_quantity_entry.delete(0, END)
         product_description_entry.delete(0, END)
+        product_min_stock_entry.delete(0, END)
 
     def display_product_record(event):
         selected_item = product_tree.focus()
         if selected_item:
             clear_product_entry_field()
             row = product_tree.item(selected_item)["values"]
+            product_id_entry.insert(0, [row[0]])
             product_name_entry.insert(0, row[1])
             product_quantity_entry.insert(0, row[2])
             product_description_entry.insert(0, row[3])
+            product_min_stock_entry.insert(0, [row[4]])
 
     def check_existing_product(product_check):
         conn = sqlite3.connect("Inventory Management System.db")
@@ -3815,9 +4781,11 @@ def worker_dashboard(username):
         return existing_supplier
 
     def add_new_product_details():
+        product_id = product_id_entry.get()
         product_name = product_name_entry.get()
         product_quantity = product_quantity_entry.get()
         product_description = product_description_entry.get()
+        product_min_stock = product_min_stock_entry.get()
 
         if not (product_name and product_quantity and product_description):
             messagebox.showerror("Error", "Please enter all fields")
@@ -3826,9 +4794,15 @@ def worker_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO PRODUCT (PRODUCT_NAME,PRODUCT_QUANTITY,PRODUCT_STATUS) \
-            VALUES (?,?,?)",
-                (product_name, product_quantity, product_description),
+                "INSERT INTO PRODUCT (PRODUCT_ID,PRODUCT_NAME,PRODUCT_QUANTITY,PRODUCT_STATUS,PRODUCT_MIN_STOCK) \
+            VALUES (?,?,?,?,?)",
+                (
+                    product_id,
+                    product_name,
+                    product_quantity,
+                    product_description,
+                    product_min_stock,
+                ),
             )
             conn.commit()
             conn.close()
@@ -3839,6 +4813,14 @@ def worker_dashboard(username):
             )
         add_to_product_table()
         clear_product_entry_field()
+        fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
         return
 
     def edit_product_details():
@@ -3847,9 +4829,11 @@ def worker_dashboard(username):
             messagebox.showerror("Error", "Please select a record to edit")
             return
         row = product_tree.item(selected_product_details)["values"]
+        new_product_id = product_id_entry.get()
         new_product_name = product_name_entry.get()
         new_product_quantity = product_quantity_entry.get()
         new_product_description = product_description_entry.get()
+        new_product_min_stock = product_min_stock_entry.get()
         if not new_product_name:
             messagebox.showerror("Error", "Please enter all fields")
             return
@@ -3857,11 +4841,13 @@ def worker_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE PRODUCT SET PRODUCT_NAME = ?, PRODUCT_QUANTITY = ?, PRODUCT_STATUS = ? WHERE PRODUCT_NAME = ?",
+                "UPDATE PRODUCT SET PRODUCT_ID = ?, PRODUCT_NAME = ?, PRODUCT_QUANTITY = ?, PRODUCT_STATUS = ?, PRODUCT_MIN_STOCK = ? WHERE PRODUCT_NAME = ?",
                 (
+                    new_product_id,
                     new_product_name,
                     new_product_quantity,
                     new_product_description,
+                    new_product_min_stock,
                     row[1],
                 ),
             )
@@ -3870,6 +4856,14 @@ def worker_dashboard(username):
             messagebox.showinfo("Success", "Record successfully edited")
         add_to_product_table()
         clear_product_entry_field()
+        fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def delete_product_database():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -3881,6 +4875,14 @@ def worker_dashboard(username):
         conn.close()
         add_to_product_table()
         clear_product_entry_field()
+        fetch_product_to_list()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def delete_product_record():
         selected_item = product_tree.focus()
@@ -3894,6 +4896,14 @@ def worker_dashboard(username):
             delete_product_database()
             messagebox.showinfo("Success", "Record successfully deleted")
             return
+
+    def search_product(event):
+        search_term = search_entry.get().lower()
+        products = fetch_product_data()
+        product_tree.delete(*product_tree.get_children())
+        for product in products:
+            if search_term in str(product).lower():
+                product_tree.insert("", tk.END, values=product)
 
     def on_product_double_click(event):
 
@@ -3911,7 +4921,7 @@ def worker_dashboard(username):
 
         new_window = customtkinter.CTk()
         new_window.title("Product Details")
-        new_window.geometry("500x400")
+        # new_window.geometry("500x400")
 
         def add_incoming_stock():
             incoming_stock_id = generate_purchase_order_id("PO")
@@ -3940,14 +4950,16 @@ def worker_dashboard(username):
             messagebox.showinfo("Success", "Data has been inserted")
             add_to_incoming_stock_table()
             fetch_tbr_quantity()
+            update_total_quantity_in_hand_label()
+            update_total_quantity_to_be_received_label()
             new_window.destroy()
 
         def fetch_tbr_quantity():
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT PURCHASE_ORDER_PRODUCT_QUANTITY FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_PRODUCT = ?",
-                (values[1],),
+                "SELECT PURCHASE_ORDER_PRODUCT_QUANTITY FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_PRODUCT = ? AND PURCHASE_ORDER_STATUS=?",
+                (values[1], "To be Received"),
             )
             incoming_stock_quantity = cursor.fetchall()
             tbr = 0
@@ -3972,9 +4984,7 @@ def worker_dashboard(username):
             conn.close()
             return tbs
 
-        product_details_frame = customtkinter.CTkFrame(
-            new_window,border_width=2
-        )
+        product_details_frame = customtkinter.CTkFrame(new_window, border_width=2)
         product_details_title = customtkinter.CTkLabel(
             product_details_frame,
             text="Product Details",
@@ -4021,9 +5031,7 @@ def worker_dashboard(username):
             font=customtkinter.CTkFont("SF Pro Display", size=13),
         )
 
-        restock_frame = customtkinter.CTkFrame(
-            new_window,border_width=2
-        )
+        restock_frame = customtkinter.CTkFrame(new_window, border_width=2)
         restock_title = customtkinter.CTkLabel(
             restock_frame,
             text="Restock",
@@ -4053,9 +5061,7 @@ def worker_dashboard(username):
             text_color="black",
         )
 
-        status_frame = customtkinter.CTkFrame(
-            new_window, border_width=2
-        )
+        status_frame = customtkinter.CTkFrame(new_window, border_width=2)
         status_details_title = customtkinter.CTkLabel(
             status_frame,
             text="Status",
@@ -4091,44 +5097,28 @@ def worker_dashboard(username):
             font=customtkinter.CTkFont("SF Pro Display", size=13),
         )
 
-        product_details_frame.grid(
-            row=0, column=0, sticky=W, padx=10, pady=10
-        )
+        product_details_frame.grid(row=0, column=0, sticky=W, padx=10, pady=10)
         product_details_title.grid(
             row=0, column=0, columnspan=2, sticky=W, padx=10, pady=10
         )
-        product_id_label.grid(
-            row=1, column=0, sticky=W, padx=5, pady=5
-        )
-        product_id_label_details.grid(
-            row=1, column=1, sticky=W, padx=5, pady=5
-        )
-        product_name_label.grid(
-            row=2, column=0, sticky=W, padx=5, pady=5
-        )
-        product_name_label_details.grid(
-            row=2, column=1, sticky=W, padx=5, pady=5
-        )
-        product_quantity_label.grid(
-            row=3, column=0, sticky=W, padx=5, pady=5
-        )
-        product_quantity_label_details.grid(
-            row=3, column=1, sticky=W, padx=5, pady=5
-        )
-        product_description_label.grid(
-            row=4, column=0, sticky=W, padx=5, pady=5
-        )
+        product_id_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
+        product_id_label_details.grid(row=1, column=1, sticky=W, padx=5, pady=5)
+        product_name_label.grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        product_name_label_details.grid(row=2, column=1, sticky=W, padx=5, pady=5)
+        product_quantity_label.grid(row=3, column=0, sticky=W, padx=5, pady=5)
+        product_quantity_label_details.grid(row=3, column=1, sticky=W, padx=5, pady=5)
+        product_description_label.grid(row=4, column=0, sticky=W, padx=5, pady=5)
         product_description_label_details.grid(
             row=4, column=1, sticky=W, padx=5, pady=5
         )
 
-        restock_frame.grid(row=1, column=0, padx=10, pady=10,columnspan=2)
+        restock_frame.grid(row=1, column=0, padx=10, pady=10, columnspan=2)
         restock_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
         restock_quantity_label.grid(row=1, column=0, sticky=W, padx=5, pady=5)
         restock_quantity_entry.grid(row=1, column=1, sticky=W, padx=5, pady=5)
         restock_btn.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
 
-        status_frame.grid(row=0,column=1,sticky=W,padx=10, pady=10)
+        status_frame.grid(row=0, column=1, sticky=W, padx=10, pady=10)
         status_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10)
         total_tbs.grid(row=1, column=0, rowspan=5, padx=15, pady=15)
         total_tbs_details_1.pack(side=TOP)
@@ -4181,7 +5171,7 @@ def worker_dashboard(username):
         for task in tasks:
             due_date_str = task[0]
             due_date = datetime.strptime(due_date_str, "%m/%d/%y")
-            if due_date <= today:
+            if due_date < today:
                 due_task += 1
                 conn = sqlite3.connect("Inventory Management System.db")
                 cursor = conn.cursor()
@@ -4192,6 +5182,8 @@ def worker_dashboard(username):
                 conn.commit()
                 conn.close()
 
+        check_task_status()
+        add_to_task_table()
         return due_task
 
     def complete_task():
@@ -4225,7 +5217,9 @@ def worker_dashboard(username):
         incoming_stocks = fetch_incoming_stock_data()
         incoming_stock_tree.delete(*incoming_stock_tree.get_children())
         for incoming_stock in incoming_stocks:
-            incoming_stock_tree.insert("", END, values=incoming_stock)
+            incoming_stock_tree.insert(
+                "", END, values=incoming_stock, tags=incoming_stock
+            )
 
     def update_purchase_order_status():
         new_status = purchase_order_status_entry.get()
@@ -4250,6 +5244,13 @@ def worker_dashboard(username):
         messagebox.showinfo("Success", "Record successfully edited")
         add_to_incoming_stock_table()
         add_to_product_table()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def check_pending_task():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -4275,21 +5276,6 @@ def worker_dashboard(username):
             toast.show()
         return list_of_task_status
 
-    def fetch_incoming_stock_data():
-        conn = sqlite3.connect("Inventory Management System.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM PURCHASE_ORDER")
-        incoming_stock = cursor.fetchall()
-        conn.commit()
-        conn.close()
-        return incoming_stock
-
-    def add_to_incoming_stock_table():
-        incoming_stocks = fetch_incoming_stock_data()
-        incoming_stock_tree.delete(*incoming_stock_tree.get_children())
-        for incoming_stock in incoming_stocks:
-            incoming_stock_tree.insert("", END, values=incoming_stock, tags=incoming_stock)
-
     def fetch_purchase_order_last_id():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -4307,6 +5293,32 @@ def worker_dashboard(username):
             number_part = str(last_id.split("-")[-1])
             new_number = int(number_part) + 1
             return f"{prefix}-{new_number:03d}"
+
+    def update_sales_order_status():
+        new_status = sales_order_status_entry.get()
+        selected = outgoing_stock_tree.focus()
+        if not selected:
+            messagebox.showerror("Error", "Please select a record to edit")
+            return
+        row = outgoing_stock_tree.item(selected)["values"]
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE SALE_ORDER SET SALE_ORDER_STATUS = ? WHERE SALE_ORDER_ID = ?",
+            (new_status, row[0]),
+        )
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", "Record successfully edited")
+        add_to_sale_order_table()
+        add_to_product_table()
+        update_to_be_packed_label()
+        update_to_be_shipped_label()
+        update_to_be_delivered_label()
+        update_total_quantity_in_hand_label()
+        update_total_quantity_to_be_received_label()
+        update_low_stock_item_label()
+        update_total_items_label()
 
     def fetch_sale_order_stock_data():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -4347,7 +5359,6 @@ def worker_dashboard(username):
 
         sale_order_window = customtkinter.CTk()
         sale_order_window.title("Product Details")
-        sale_order_window.geometry("1080x720")
 
         product_selection_frame = customtkinter.CTkFrame(
             master=sale_order_window, border_width=2
@@ -4360,7 +5371,9 @@ def worker_dashboard(username):
         def fetch_sale_order_product_data():
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM SALE_ORDER_PRODUCT WHERE SALE_ORDER_ID = ?", (values[0],))
+            cursor.execute(
+                "SELECT * FROM SALE_ORDER_PRODUCT WHERE SALE_ORDER_ID = ?", (values[0],)
+            )
             sale_order = cursor.fetchall()
             conn.commit()
             conn.close()
@@ -4384,47 +5397,104 @@ def worker_dashboard(username):
                 conn = sqlite3.connect("Inventory Management System.db")
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID,SALE_ORDER_PRODUCT,SALE_ORDER_PRODUCT_QUANTITY) \
-                VALUES (?,?,?)",
-                    (sale_order_id, sale_order_product, sale_order_product_quantity),
+                    "SELECT PRODUCT_QUANTITY FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,),
                 )
-                conn.commit()
-                conn.close()
-                messagebox.showinfo("Success", "Data has been inserted")
+                product_quantity = cursor.fetchone()[0]
+                if product_quantity < int(sale_order_product_quantity):
+                    messagebox.showerror("Error", "Insufficient quantity")
+                    return
+                else:
+                    conn = sqlite3.connect("Inventory Management System.db")
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID,SALE_ORDER_PRODUCT,SALE_ORDER_PRODUCT_QUANTITY) \
+                    VALUES (?,?,?)",
+                        (sale_order_id, sale_order_product, sale_order_product_quantity),
+                    )
+                    cursor.execute(
+                        "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY - ? WHERE PRODUCT_NAME = ?",
+                        (sale_order_product_quantity, sale_order_product),
+                    )
+                    conn.commit()
+                    conn.close()
+                    messagebox.showinfo("Success", "Data has been inserted")
             add_to_sale_order_product_table()
+            add_to_product_table()
+            update_low_stock_item_label()
             return
 
-        select_product_label = customtkinter.CTkLabel(product_selection_frame, text="Select Product",
-                                                       font=customtkinter.CTkFont("SF Pro Display", weight='bold',
-                                                                                  size=15))
+        select_product_label = customtkinter.CTkLabel(
+            product_selection_frame,
+            text="Select Product",
+            font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+        )
 
-        product_selection_label = customtkinter.CTkLabel(product_selection_frame, text="Product to be purchase:",
-                                                         font=customtkinter.CTkFont("SF Pro Display"))
-        product_selection_entry = customtkinter.CTkComboBox(master=product_selection_frame, values=fetch_product_to_list(),
-                                                            width=230,
-                                                            height=30, font=customtkinter.CTkFont("SF Pro Display"),
-                                                            border_width=0)
-        sales_quantity_label = customtkinter.CTkLabel(product_selection_frame, text="Purchase Quantity:",
-                                                      font=customtkinter.CTkFont("SF Pro Display"))
-        sales_quantity_entry = customtkinter.CTkEntry(master=product_selection_frame, placeholder_text="Quantity", width=230,
-                                                      height=30, font=customtkinter.CTkFont("SF Pro Display"),
-                                                      border_width=0)
-        sales_btn = customtkinter.CTkButton(master=product_selection_frame, text="Add Item",
-                                            command=add_sale_order_product, font=customtkinter.CTkFont("SF Pro Display"),
-                                            corner_radius=200, fg_color="#007FFF", text_color="black")
+        product_selection_label = customtkinter.CTkLabel(
+            product_selection_frame,
+            text="Product to be purchase:",
+            font=customtkinter.CTkFont("SF Pro Display"),
+        )
+        product_selection_entry = customtkinter.CTkComboBox(
+            master=product_selection_frame,
+            values=fetch_product_to_list(),
+            width=230,
+            height=30,
+            font=customtkinter.CTkFont("SF Pro Display"),
+            border_width=0,
+        )
+        sales_quantity_label = customtkinter.CTkLabel(
+            product_selection_frame,
+            text="Purchase Quantity:",
+            font=customtkinter.CTkFont("SF Pro Display"),
+        )
+        sales_quantity_entry = customtkinter.CTkEntry(
+            master=product_selection_frame,
+            placeholder_text="Quantity",
+            width=230,
+            height=30,
+            font=customtkinter.CTkFont("SF Pro Display"),
+            border_width=0,
+        )
+        sales_btn = customtkinter.CTkButton(
+            master=product_selection_frame,
+            text="Add Item",
+            command=add_sale_order_product,
+            font=customtkinter.CTkFont("SF Pro Display"),
+            corner_radius=200,
+            fg_color="#007FFF",
+            text_color="black",
+        )
 
         style1 = ThemedStyle()
         style1.set_theme("equilux")
-        style1.configure("Treeview", font=("SF Pro Display", 10), rowheight=24, foreground="white",
-                        background="#2a2d2e",
-                        fieldbackground="#343638", bordercolor="#343638", borderwidth=0)
-        style1.map('Treeview', background=[('selected', '#22559b')])
-        style1.configure("Treeview.Heading", background="#565b5e", foreground="white", relief="flat")
-        style1.map("Treeview.Heading", background=[('active', '#3484F0')])
-        style1.configure("DateEntry", font=customtkinter.CTkFont("SF Pro Display", 12), foreground="white",
-                        background="#2a2d2e", fieldbackground="#343638", bordercolor="#343638", borderwidth=0)
+        style1.configure(
+            "Treeview",
+            font=("SF Pro Display", 10),
+            rowheight=24,
+            foreground="white",
+            background="#2a2d2e",
+            fieldbackground="#343638",
+            bordercolor="#343638",
+            borderwidth=0,
+        )
+        style1.map("Treeview", background=[("selected", "#22559b")])
+        style1.configure(
+            "Treeview.Heading", background="#565b5e", foreground="white", relief="flat"
+        )
+        style1.map("Treeview.Heading", background=[("active", "#3484F0")])
+        style1.configure(
+            "DateEntry",
+            font=customtkinter.CTkFont("SF Pro Display", 12),
+            foreground="white",
+            background="#2a2d2e",
+            fieldbackground="#343638",
+            bordercolor="#343638",
+            borderwidth=0,
+        )
 
-        sale_order_product_tree = ttk.Treeview(master=sale_order_product_table_frame, height=30)
+        sale_order_product_tree = ttk.Treeview(
+            master=sale_order_product_table_frame, height=30
+        )
 
         sale_order_product_verscrlbar = customtkinter.CTkScrollbar(
             master=sale_order_product_table_frame,
@@ -4433,7 +5503,9 @@ def worker_dashboard(username):
         )
         sale_order_product_verscrlbar.pack(side="right", fill="y")
 
-        sale_order_product_tree.configure(yscrollcommand=sale_order_product_verscrlbar.set)
+        sale_order_product_tree.configure(
+            yscrollcommand=sale_order_product_verscrlbar.set
+        )
         sale_order_product_tree["columns"] = (
             "SALEORDERID",
             "SALEORDERPRODUCT",
@@ -4451,33 +5523,86 @@ def worker_dashboard(username):
 
         sale_order_product_tree.pack(side="bottom", fill="both")
 
-        product_selection_frame.grid(
-            row=0,column=0, padx=10, pady=10, sticky=NW
-        )
-        select_product_label.grid(
-            row=0,column=0, padx=10, pady=10
-        )
-        product_selection_label.grid(
-            row=1,column=0, padx=10, pady=10
-        )
-        product_selection_entry.grid(
-            row=1,column=1, padx=10, pady=10
-        )
-        sales_quantity_label.grid(
-            row=2,column=0, padx=10, pady=10
-        )
-        sales_quantity_entry.grid(
-            row=2,column=1, padx=10, pady=10
-        )
-        sales_btn.grid(
-            row=3,column=0, padx=10, pady=10, columnspan=2
-        )
-        sale_order_product_table_frame.grid(
-            row=0,column=1, padx=10, pady=10
-        )
+        product_selection_frame.grid(row=0, column=0, padx=10, pady=10, sticky=NW)
+        select_product_label.grid(row=0, column=0, padx=10, pady=10)
+        product_selection_label.grid(row=1, column=0, padx=10, pady=10)
+        product_selection_entry.grid(row=1, column=1, padx=10, pady=10)
+        sales_quantity_label.grid(row=2, column=0, padx=10, pady=10)
+        sales_quantity_entry.grid(row=2, column=1, padx=10, pady=10)
+        sales_btn.grid(row=3, column=0, padx=10, pady=10, columnspan=2)
+        sale_order_product_table_frame.grid(row=0, column=1, padx=10, pady=10)
 
         add_to_sale_order_product_table()
         sale_order_window.mainloop()
+
+
+    def low_stock_vs_total_item_pie_chart(canvas):
+        data=[]
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT WHERE PRODUCT_QUANTITY < PRODUCT_MIN_STOCK")
+        low_stock_items = cursor.fetchone()[0]
+        data.append(low_stock_items)
+        conn.commit()
+        conn.close()
+
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(PRODUCT_ID) FROM PRODUCT")
+        total_items = cursor.fetchone()[0]
+        data.append(total_items - low_stock_items)
+        conn.commit()
+        conn.close()
+
+        fig = plt.Figure()
+        ax = fig.add_subplot(111)
+        fig.patch.set_facecolor('#e5e5e5')  # Set the figure background color
+        ax.set_facecolor('#e5e5e5')  # Set the axes background color
+        ax.axis("equal")
+
+        ax.pie(data, labels=["Low Stock", "In Stock"], autopct="%.2f%%", pctdistance=0.85)
+
+        centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+        ax.add_artist(centre_circle)
+
+        canvas.figure = fig
+        canvas.draw()
+
+    def bar_chart(canvas):
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT PRODUCT_ID, PRODUCT_QUANTITY FROM PRODUCT")
+        data = cursor.fetchall()
+        conn.commit()
+        conn.close()
+
+        product_ids = [row[0] for row in data]
+        product_quantities = [row[1] for row in data]
+
+        fig1 = plt.Figure()
+        ax = fig1.add_subplot(111)
+        fig1.patch.set_facecolor('#e5e5e5')
+        ax.set_facecolor('#e5e5e5')
+        ax.bar(product_ids, product_quantities)
+        ax.tick_params(axis='x', labelsize=5)
+        ax.tick_params(axis='y', labelsize=10)
+        ax.set_xlabel('Product Name', fontsize=12)
+        ax.set_ylabel('Product Quantity', fontsize=12)
+        ax.set_title('Inventory', fontsize=14)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
+
+        canvas.figure = fig1
+        canvas.draw()
+
+    def sort_treeview_column(tv, col, reverse):
+        l = [(tv.set(k, col), k) for k in tv.get_children('')]
+        l.sort(reverse=reverse)
+
+        for index, (val, k) in enumerate(l):
+            tv.move(k, '', index)
+
+        tv.heading(col, command=lambda: sort_treeview_column(tv, col, not reverse))
 
     worker_dashboard_frame = customtkinter.CTkFrame(
         master=app, width=1280, height=720, border_width=0
@@ -4531,89 +5656,193 @@ def worker_dashboard(username):
         font=customtkinter.CTkFont("SF Pro Display", 24, weight="bold"),
     )
 
-    sales_activity_frame = customtkinter.CTkFrame(tab_0, corner_radius=10)
+    sales_activity_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
     sales_activity_title = customtkinter.CTkLabel(
         sales_activity_frame,
         text="Sales Activity",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
     )
-    total_tbs = customtkinter.CTkFrame(
-        master=sales_activity_frame, fg_color="transparent"
-    )
-    total_tbs_details_1 = customtkinter.CTkLabel(
-        master=total_tbs,
-        text="0 Qty",
-        font=customtkinter.CTkFont("SF Pro Display", size=13),
-    )
-    total_tbs_details_2 = customtkinter.CTkLabel(
-        master=total_tbs,
-        text="To be Shipped",
-        font=customtkinter.CTkFont("SF Pro Display", size=13),
-    )
-    sales_activity_vertical_separator = customtkinter.CTkFrame(
-        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
-    )
-    total_tbr = customtkinter.CTkFrame(
-        master=sales_activity_frame, width=100, height=100, fg_color="transparent"
-    )
-    total_tbr_details_1 = customtkinter.CTkLabel(
-        total_tbr, text="0 Qty", font=customtkinter.CTkFont("SF Pro Display", size=13)
-    )
-    total_tbr_details_2 = customtkinter.CTkLabel(
-        total_tbr,
-        text="To be Received",
+
+    total_to_be_packed_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_packed_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
 
-    inventory_summary_frame = customtkinter.CTkFrame(tab_0, corner_radius=10)
+    total_to_be_packed_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Packed",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_1 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    total_to_be_shipped_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_shipped_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    total_to_be_shipped_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Shipped",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_2 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    total_to_be_delivered_label_1 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text=str(fetch_to_be_delivered_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    total_to_be_delivered_label_2 = customtkinter.CTkLabel(
+        master=sales_activity_frame,
+        text="To be Delivered",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_3 = customtkinter.CTkFrame(
+        sales_activity_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    inventory_summary_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
     inventory_summary_title = customtkinter.CTkLabel(
         inventory_summary_frame,
         text="Inventory Summary",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
     )
-    total_in_hand_1 = customtkinter.CTkLabel(
+
+    total_quantity_in_hand_1 = customtkinter.CTkLabel(
         master=inventory_summary_frame,
-        text="Quantity in Hand",
+        text=str(fetch_total_quantity_in_hand_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    total_in_hand_2 = customtkinter.CTkLabel(
+
+    total_quantity_in_hand_2 = customtkinter.CTkLabel(
         master=inventory_summary_frame,
-        text="12345",
+        text="Quantity In Hand",
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    inventory_summary_horizontal_separator = customtkinter.CTkFrame(
-        inventory_summary_frame, width=200, height=2, fg_color="#CCCCCC"
+
+    sales_activity_vertical_separator_4 = customtkinter.CTkFrame(
+        inventory_summary_frame, width=2, height=50, fg_color="#CCCCCC"
     )
-    total_tobereceived_details_1 = customtkinter.CTkLabel(
-        inventory_summary_frame,
-        text="Quantity To Be Received",
+
+    total_quantity_to_be_received_1 = customtkinter.CTkLabel(
+        master=inventory_summary_frame,
+        text=str(fetch_total_quantity_to_be_received_data()),
         font=customtkinter.CTkFont("SF Pro Display", size=13),
     )
-    total_tobereceived_details_2 = customtkinter.CTkLabel(
-        inventory_summary_frame,
-        text="100",
+
+    total_quantity_to_be_received_2 = customtkinter.CTkLabel(
+        master=inventory_summary_frame,
+        text="Quantity To be Received",
         font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_5 = customtkinter.CTkFrame(
+        inventory_summary_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    product_details_frame = customtkinter.CTkFrame(
+        tab_0, corner_radius=10, border_width=2
+    )
+
+    product_details_title = customtkinter.CTkLabel(
+        product_details_frame,
+        text="Product Details",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+    )
+
+    low_stock_items_1 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text=str(fetch_low_stock_item_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    low_stock_items_2 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text="Low Stock Items",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_6 = customtkinter.CTkFrame(
+        product_details_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    all_items_1 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text=str(fetch_total_items_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    all_items_2 = customtkinter.CTkLabel(
+        master=product_details_frame,
+        text="Total Items",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    sales_activity_vertical_separator_7 = customtkinter.CTkFrame(
+        product_details_frame, width=2, height=50, fg_color="#CCCCCC"
     )
 
     welcome_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
-    sales_activity_frame.grid(row=1, column=0, sticky=W, padx=10, pady=10)
-    inventory_summary_frame.grid(row=1, column=1, sticky=W, padx=10, pady=10)
+    sales_activity_frame.grid(row=1, column=0, padx=10, pady=10)
+    inventory_summary_frame.grid(row=1, column=1, padx=10, pady=10)
+    product_details_frame.grid(row=1, column=2, padx=10, pady=10)
+    fig = plt.Figure()
+    fig.set_facecolor('#e5e5e5')
+    canvas = FigureCanvasTkAgg(fig, master=tab_0)
+    canvas.get_tk_widget().grid(row=2, column=0, padx=10, pady=10, columnspan=3, sticky="W")
+    low_stock_vs_total_item_pie_chart(canvas)
 
-    sales_activity_title.grid(row=0, column=0, sticky=W, padx=20, pady=10)
-    total_tbs.grid(row=1, column=0, sticky=W, padx=40, pady=(20, 40))
-    total_tbs_details_1.pack(side=TOP)
-    total_tbs_details_2.pack(side=BOTTOM)
-    sales_activity_vertical_separator.grid(row=1, column=1)
-    total_tbr.grid(row=1, column=2, sticky=W, padx=40, pady=(20, 40))
-    total_tbr_details_1.pack(side=TOP)
-    total_tbr_details_2.pack(side=BOTTOM)
+    fig1 = plt.Figure()
+    fig1.set_facecolor('#e5e5e5')
+    canvas1 = FigureCanvasTkAgg(fig1, master=tab_0)
+    canvas1.get_tk_widget().grid(row=2, column=1, padx=10, pady=10, columnspan=2)
+    bar_chart(canvas1)
 
-    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=20, pady=10)
-    total_in_hand_1.grid(row=1, column=0, sticky=W, padx=10, pady=(0, 10))
-    total_in_hand_2.grid(row=1, column=1, sticky=W, padx=10, pady=(0, 10))
-    inventory_summary_horizontal_separator.grid(row=2, column=0, columnspan=2)
-    total_tobereceived_details_1.grid(row=3, column=0, sticky=W, padx=10, pady=(10, 10))
-    total_tobereceived_details_2.grid(row=3, column=1, sticky=W, padx=10, pady=(10, 10))
+
+    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    total_to_be_packed_label_1.grid(row=1, column=0, padx=20, pady=5)
+    total_to_be_packed_label_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    total_to_be_shipped_label_1.grid(row=1, column=2, padx=20, pady=5)
+    total_to_be_shipped_label_2.grid(row=2, column=2, padx=20, pady=5)
+    sales_activity_vertical_separator_2.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+    total_to_be_delivered_label_1.grid(row=1, column=4, padx=20, pady=5)
+    total_to_be_delivered_label_2.grid(row=2, column=4, padx=20, pady=5)
+    # sales_activity_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
+
+    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    total_quantity_in_hand_1.grid(row=1, column=0, padx=20, pady=5)
+    total_quantity_in_hand_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_4.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    total_quantity_to_be_received_1.grid(row=1, column=2, padx=20, pady=5)
+    total_quantity_to_be_received_2.grid(row=2, column=2, padx=20, pady=5)
+    # sales_activity_vertical_separator_5.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+
+    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    low_stock_items_1.grid(row=1, column=0, padx=20, pady=5)
+    low_stock_items_2.grid(row=2, column=0, padx=20, pady=5)
+    sales_activity_vertical_separator_6.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    all_items_1.grid(row=1, column=2, padx=20, pady=5)
+    all_items_2.grid(row=2, column=2, padx=20, pady=5)
+    # sales_activity_vertical_separator_7.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+
+    tab_0.columnconfigure(1, weight=1)
 
     customer_table_frame = customtkinter.CTkFrame(master=tab_1, width=1280, height=515)
     customer_table_frame.place(x=0, y=205)
@@ -4648,13 +5877,25 @@ def worker_dashboard(username):
     customer_tree.bind("<Double-1>", on_customer_double_click)
     customer_tree.bind("<ButtonRelease>", display_customer_record)
 
-    insert_customer_data_label = customtkinter.CTkLabel(
+    customer_menu_frame = customtkinter.CTkFrame(
         master=tab_1,
+        border_width=2
+    )
+
+    insert_customer_data_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
         text="Insert New Customer",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
+
+    customer_name_entry_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
+        text="Customer Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     customer_name_entry = customtkinter.CTkEntry(
-        master=tab_1,
+        master=customer_menu_frame,
         placeholder_text="Name",
         width=230,
         height=30,
@@ -4662,8 +5903,14 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    customer_email_entry_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
+        text="Customer Email Address:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     customer_email_entry = customtkinter.CTkEntry(
-        master=tab_1,
+        master=customer_menu_frame,
         placeholder_text="Email Address",
         width=230,
         height=30,
@@ -4671,8 +5918,14 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    customer_contact_entry_label = customtkinter.CTkLabel(
+        master=customer_menu_frame,
+        text="Customer Contact No.:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     customer_contact_entry = customtkinter.CTkEntry(
-        master=tab_1,
+        master=customer_menu_frame,
         placeholder_text="Contact No.",
         width=230,
         height=30,
@@ -4681,7 +5934,7 @@ def worker_dashboard(username):
     )
 
     addcustomer_btn = customtkinter.CTkButton(
-        master=tab_1,
+        master=customer_menu_frame,
         text="Add",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_customer_details,
@@ -4692,7 +5945,7 @@ def worker_dashboard(username):
     )
 
     editcustomer_btn = customtkinter.CTkButton(
-        master=tab_1,
+        master=customer_menu_frame,
         text="Edit",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_customer_details,
@@ -4703,7 +5956,7 @@ def worker_dashboard(username):
     )
 
     deletecustomer_btn = customtkinter.CTkButton(
-        master=tab_1,
+        master=customer_menu_frame,
         text="Delete",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_customer_record,
@@ -4713,13 +5966,22 @@ def worker_dashboard(username):
         text_color="black",
     )
 
-    insert_customer_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    customer_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    customer_email_entry.grid(row=1, column=1, padx=5, pady=5)
-    customer_contact_entry.grid(row=1, column=2, padx=5, pady=5)
-    addcustomer_btn.grid(row=2, column=3, padx=20, pady=80)
-    editcustomer_btn.grid(row=2, column=4, padx=20, pady=80)
-    deletecustomer_btn.grid(row=2, column=5, padx=20, pady=80)
+    customer_menu_frame.grid(row=0, column=0)
+
+    insert_customer_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
+
+    customer_name_entry_label.grid(row=1, column=0, padx=5, pady=5)
+    customer_name_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+    customer_email_entry_label.grid(row=1, column=2, padx=5, pady=5)
+    customer_email_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+    customer_contact_entry_label.grid(row=1, column=4, padx=5, pady=5)
+    customer_contact_entry.grid(row=1, column=5, padx=5, pady=5, sticky="w")
+
+    addcustomer_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+    editcustomer_btn.grid(row=2, column=2, padx=5, pady=5, columnspan=2)
+    deletecustomer_btn.grid(row=2, column=4, padx=5, pady=5, columnspan=2)
+
+    tab_1.columnconfigure(0, weight=2)
 
     supplier_table_frame = customtkinter.CTkFrame(master=tab_2, width=1280, height=515)
     supplier_table_frame.place(x=0, y=205)
@@ -4753,13 +6015,25 @@ def worker_dashboard(username):
     supplier_tree.pack(side="right", fill="both")
     supplier_tree.bind("<ButtonRelease>", display_supplier_record)
 
-    insert_supplier_data_label = customtkinter.CTkLabel(
+    supplier_menu_frame = customtkinter.CTkFrame(
         master=tab_2,
+        border_width=2
+    )
+
+    insert_supplier_data_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
         text="Insert New Supplier",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
+
+    supplier_name_entry_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
+        text="Supplier Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     supplier_name_entry = customtkinter.CTkEntry(
-        master=tab_2,
+        master=supplier_menu_frame,
         placeholder_text="Name",
         width=230,
         height=30,
@@ -4767,8 +6041,14 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    supplier_email_entry_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
+        text="Supplier Email Address:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     supplier_email_entry = customtkinter.CTkEntry(
-        master=tab_2,
+        master=supplier_menu_frame,
         placeholder_text="Email Address",
         width=230,
         height=30,
@@ -4776,8 +6056,14 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    supplier_contact_entry_label = customtkinter.CTkLabel(
+        master=supplier_menu_frame,
+        text="Supplier Contact No.:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     supplier_contact_entry = customtkinter.CTkEntry(
-        master=tab_2,
+        master=supplier_menu_frame,
         placeholder_text="Contact No.",
         width=230,
         height=30,
@@ -4786,9 +6072,9 @@ def worker_dashboard(username):
     )
 
     addsupplier_btn = customtkinter.CTkButton(
-        master=tab_2,
+        master=supplier_menu_frame,
         text="Add",
-        font=customtkinter.CTkFont(("SF Pro Display")),
+        font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_supplier_details,
         compound="top",
         corner_radius=200,
@@ -4797,9 +6083,9 @@ def worker_dashboard(username):
     )
 
     editsupplier_btn = customtkinter.CTkButton(
-        master=tab_2,
+        master=supplier_menu_frame,
         text="Edit",
-        font=customtkinter.CTkFont(("SF Pro Display")),
+        font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_supplier_details,
         compound="top",
         corner_radius=200,
@@ -4808,9 +6094,9 @@ def worker_dashboard(username):
     )
 
     deletesupplier_btn = customtkinter.CTkButton(
-        master=tab_2,
+        master=supplier_menu_frame,
         text="Delete",
-        font=customtkinter.CTkFont(("SF Pro Display")),
+        font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_supplier_record,
         compound="top",
         corner_radius=200,
@@ -4818,13 +6104,22 @@ def worker_dashboard(username):
         text_color="black",
     )
 
-    insert_supplier_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    supplier_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    supplier_email_entry.grid(row=1, column=1, padx=5, pady=5)
-    supplier_contact_entry.grid(row=1, column=2, padx=5, pady=5)
-    addsupplier_btn.grid(row=2, column=3, padx=20, pady=80)
-    editsupplier_btn.grid(row=2, column=4, padx=20, pady=80)
-    deletesupplier_btn.grid(row=2, column=5, padx=20, pady=80)
+    supplier_menu_frame.grid(row=0, column=0)
+
+    insert_supplier_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
+
+    supplier_name_entry_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    supplier_name_entry.grid(row=1, column=1, padx=5, pady=5)
+    supplier_email_entry_label.grid(row=1, column=2, sticky="w", padx=5, pady=5)
+    supplier_email_entry.grid(row=1, column=3, padx=5, pady=5)
+    supplier_contact_entry_label.grid(row=1, column=4, sticky="w", padx=5, pady=5)
+    supplier_contact_entry.grid(row=1, column=5, padx=5, pady=5)
+
+    addsupplier_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+    editsupplier_btn.grid(row=2, column=2, padx=5, pady=5, columnspan=2)
+    deletesupplier_btn.grid(row=2, column=4, padx=5, pady=5, columnspan=2)
+
+    tab_2.columnconfigure(0, weight=2)
 
     product_table_frame = customtkinter.CTkFrame(master=tab_3, width=1280, height=515)
     product_table_frame.place(x=0, y=205)
@@ -4842,30 +6137,64 @@ def worker_dashboard(username):
         "PRODUCTNAME",
         "PRODUCTQUANTITY",
         "PRODUCTDESCRIPTION",
+        "PRODUCTMINSTOCK",
     )
 
     product_tree.column("#0", width=0, stretch=tk.NO)
-    product_tree.column("PRODUCTID", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTNAME", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTQUANTITY", anchor=tk.CENTER, width=313)
-    product_tree.column("PRODUCTDESCRIPTION", anchor=tk.CENTER, width=313)
+    product_tree.column("PRODUCTID", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTNAME", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTQUANTITY", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTDESCRIPTION", anchor=tk.CENTER, width=250)
+    product_tree.column("PRODUCTMINSTOCK", anchor=tk.CENTER, width=250)
 
-    product_tree.heading("PRODUCTID", text="ID")
+    product_tree.heading("PRODUCTID", text="ID", command=lambda: sort_treeview_column(product_tree, "PRODUCTID", False))
     product_tree.heading("PRODUCTNAME", text="Name")
     product_tree.heading("PRODUCTQUANTITY", text="Quantity")
     product_tree.heading("PRODUCTDESCRIPTION", text="Description")
+    product_tree.heading("PRODUCTMINSTOCK", text="Min. Stock")
 
     product_tree.pack(side="bottom", fill="both")
     product_tree.bind("<Double-1>", on_product_double_click)
     product_tree.bind("<ButtonRelease>", display_product_record)
 
-    insert_product_data_label = customtkinter.CTkLabel(
+    search_entry = customtkinter.CTkEntry(tab_3,placeholder_text="Search", width=1050,)
+    search_entry.grid(row=1,column=0, padx=10, pady=10)
+    search_entry.bind("<KeyRelease>", search_product)
+
+    product_menu_frame = customtkinter.CTkFrame(
         master=tab_3,
+        border_width=2
+    )
+
+    insert_product_data_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
         text="Insert New Product",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
+
+    product_id_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product ID:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_id_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="ID",
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+
+    product_name_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Name:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_name_entry = customtkinter.CTkEntry(
-        master=tab_3,
+        master=product_menu_frame,
         placeholder_text="Item",
         width=230,
         height=30,
@@ -4873,8 +6202,14 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    product_quantity_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Quantity:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_quantity_entry = customtkinter.CTkEntry(
-        master=tab_3,
+        master=product_menu_frame,
         placeholder_text="Quantity",
         width=230,
         height=30,
@@ -4882,8 +6217,14 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    product_description_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Description:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
     product_description_entry = customtkinter.CTkEntry(
-        master=tab_3,
+        master=product_menu_frame,
         placeholder_text="Description",
         width=230,
         height=30,
@@ -4891,8 +6232,23 @@ def worker_dashboard(username):
         border_width=0,
     )
 
+    product_min_stock_entry_label = customtkinter.CTkLabel(
+        master=product_menu_frame,
+        text="Product Min. Stock:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+
+    product_min_stock_entry = customtkinter.CTkEntry(
+        master=product_menu_frame,
+        placeholder_text="Min. Stock",
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+
     addproduct_btn = customtkinter.CTkButton(
-        master=tab_3,
+        master=product_menu_frame,
         text="Add Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=add_new_product_details,
@@ -4903,7 +6259,7 @@ def worker_dashboard(username):
     )
 
     editproduct_btn = customtkinter.CTkButton(
-        master=tab_3,
+        master=product_menu_frame,
         text="Edit Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=edit_product_details,
@@ -4914,7 +6270,7 @@ def worker_dashboard(username):
     )
 
     deleteproduct_btn = customtkinter.CTkButton(
-        master=tab_3,
+        master=product_menu_frame,
         text="Delete Product",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=delete_product_record,
@@ -4924,13 +6280,30 @@ def worker_dashboard(username):
         text_color="black",
     )
 
-    insert_product_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    product_name_entry.grid(row=1, column=0, padx=5, pady=5)
-    product_quantity_entry.grid(row=1, column=1, padx=5, pady=5)
-    product_description_entry.grid(row=1, column=2, padx=5, pady=5)
-    addproduct_btn.grid(row=2, column=3, padx=20, pady=80)
-    editproduct_btn.grid(row=2, column=4, padx=20, pady=80)
-    deleteproduct_btn.grid(row=2, column=5, padx=20, pady=80)
+    product_menu_frame.grid(row=0, column=0)
+
+    insert_product_data_label.grid(
+        row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2
+    )
+
+    product_id_entry_label.grid(row=1, column=0, padx=5)
+    product_id_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+    product_name_entry_label.grid(row=1, column=2, padx=5)
+    product_name_entry.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+    product_quantity_entry_label.grid(row=1, column=4, padx=5)
+    product_quantity_entry.grid(row=1, column=5, padx=5, pady=5, sticky="w")
+    product_description_entry_label.grid(row=2, column=0, padx=5)
+    product_description_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+    product_min_stock_entry_label.grid(row=2, column=2, padx=5)
+    product_min_stock_entry.grid(row=2, column=3, padx=5, pady=5)
+
+    addproduct_btn.grid(row=3, column=0, padx=20, pady=5, columnspan=2)
+    editproduct_btn.grid(row=3, column=2, padx=20, pady=5, columnspan=2)
+    deleteproduct_btn.grid(row=3, column=4, padx=20, pady=5, columnspan=2)
+
+    product_menu_frame.columnconfigure(1, weight=3)
+
+    tab_3.columnconfigure(0, weight=2)
 
     task_table_frame = customtkinter.CTkFrame(master=tab_4, width=1280, height=515)
     task_table_frame.place(x=0, y=205)
@@ -4966,7 +6339,7 @@ def worker_dashboard(username):
         corner_radius=200,
         text_color="black",
         width=150,
-        height=50
+        height=50,
     )
     completetask_btn.pack(anchor="center", pady=20)
 
@@ -5005,12 +6378,14 @@ def worker_dashboard(username):
 
     incoming_stock_tree.pack(side="bottom", fill="both")
 
-    incoming_stock_menu_frame = customtkinter.CTkFrame(
-        master=tab_5, border_width=2
-    )
+    incoming_stock_menu_frame = customtkinter.CTkFrame(master=tab_5, border_width=2)
 
-    incoming_stock_tree.tag_configure("To be Received", background="#FFBA00", foreground="black")
-    incoming_stock_tree.tag_configure("Received", background="green", foreground="black")
+    incoming_stock_tree.tag_configure(
+        "To be Received", background="#FFBA00", foreground="black"
+    )
+    incoming_stock_tree.tag_configure(
+        "Received", background="green", foreground="black"
+    )
 
     edit_purchase_order_status_label = customtkinter.CTkLabel(
         master=incoming_stock_menu_frame,
@@ -5030,36 +6405,31 @@ def worker_dashboard(username):
         font=customtkinter.CTkFont("SF Pro Display"),
         border_width=0,
     )
-    editpurchaseorder_btn = customtkinter.CTkButton(master=incoming_stock_menu_frame, text="Edit Status",
-                                              font=customtkinter.CTkFont("SF Pro Display"),
-                                              command=update_purchase_order_status,
-                                              compound='top', corner_radius=200, fg_color="#007FFF", text_color="black")
-
-    incoming_stock_menu_frame.grid(
-        row=0, column=0,pady=10
-    )
-    edit_purchase_order_status_label.grid(
-        row=0, column=0, padx=10, pady=10
-    )
-    purchase_order_status_label.grid(
-        row=1, column=0, padx=5, pady=5
-    )
-    purchase_order_status_entry.grid(
-        row=1, column=1, padx=5, pady=5
-    )
-    editpurchaseorder_btn.grid(
-        row=2, column=0, padx=5, pady=5,columnspan=2
+    editpurchaseorder_btn = customtkinter.CTkButton(
+        master=incoming_stock_menu_frame,
+        text="Edit Status",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=update_purchase_order_status,
+        compound="top",
+        corner_radius=200,
+        fg_color="#007FFF",
+        text_color="black",
     )
 
-    tab_5.columnconfigure(0, weight=1)
+    incoming_stock_menu_frame.grid(row=0, column=0, pady=10)
+    edit_purchase_order_status_label.grid(row=0, column=0, padx=10, pady=10)
+    purchase_order_status_label.grid(row=1, column=0, padx=5, pady=5)
+    purchase_order_status_entry.grid(row=1, column=1, padx=5, pady=5)
+    editpurchaseorder_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+
     tab_5.columnconfigure(0, weight=1)
 
     outgoing_stock_table_frame = customtkinter.CTkFrame(
         master=tab_6, width=1006, height=515
     )
-    outgoing_stock_table_frame.place(x=0, y=0)
+    outgoing_stock_table_frame.place(x=0, y=205)
 
-    outgoing_stock_tree = ttk.Treeview(master=outgoing_stock_table_frame, height=30)
+    outgoing_stock_tree = ttk.Treeview(master=outgoing_stock_table_frame, height=20)
 
     outgoing_stock_verscrlbar = customtkinter.CTkScrollbar(
         master=outgoing_stock_table_frame,
@@ -5073,20 +6443,62 @@ def worker_dashboard(username):
         "OUTGOINGSTOCKID",
         "OUTGOINGSTOCKNAME",
         "OUTGOINGSTOCKQUANTITY",
+        "OUTGOINGSTOCKSTATUS"
     )
 
     outgoing_stock_tree.column("#0", width=0, stretch=tk.NO)
-    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=418)
-    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=418)
-    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=418)
+    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKSTATUS", anchor=tk.CENTER, width=313)
 
     outgoing_stock_tree.heading("OUTGOINGSTOCKID", text="ID")
     outgoing_stock_tree.heading("OUTGOINGSTOCKNAME", text="Date Created")
     outgoing_stock_tree.heading("OUTGOINGSTOCKQUANTITY", text="Customer Name")
+    outgoing_stock_tree.heading("OUTGOINGSTOCKSTATUS", text="Status")
 
     outgoing_stock_tree.pack(side="bottom", fill="both")
 
     outgoing_stock_tree.bind("<Double-1>", on_sale_order_double_click)
+
+    outgoing_stock_menu_frame = customtkinter.CTkFrame(master=tab_6, border_width=2)
+
+    edit_sales_order_status_label = customtkinter.CTkLabel(
+        master=outgoing_stock_menu_frame,
+        text="Edit Sales Order Status",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
+    )
+    sales_order_status_label = customtkinter.CTkLabel(
+        master=outgoing_stock_menu_frame,
+        text="Status:",
+        font=customtkinter.CTkFont("SF Pro Display"),
+    )
+    sales_order_status_entry = customtkinter.CTkComboBox(
+        master=outgoing_stock_menu_frame,
+        values=["To be Packed", "To be Shipped", "To be Delivered", "Delivered"],
+        width=230,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+    editsalesorder_btn = customtkinter.CTkButton(
+        master=outgoing_stock_menu_frame,
+        text="Edit Status",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=update_sales_order_status,
+        compound="top",
+        corner_radius=200,
+        fg_color="#007FFF",
+        text_color="black",
+    )
+
+    outgoing_stock_menu_frame.grid(row=0, column=0, pady=10)
+    edit_sales_order_status_label.grid(row=0, column=0, padx=10, pady=10)
+    sales_order_status_label.grid(row=1, column=0, padx=5, pady=5)
+    sales_order_status_entry.grid(row=1, column=1, padx=5, pady=5)
+    editsalesorder_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
+
+    tab_6.columnconfigure(0, weight=2)
 
     add_to_customer_table()
     add_to_supplier_table()
@@ -5097,6 +6509,7 @@ def worker_dashboard(username):
     check_task_due_date()
     add_to_incoming_stock_table()
     add_to_sale_order_table()
+
 
 login_page()
 #admin_dashboard("admin")
