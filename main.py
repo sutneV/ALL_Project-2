@@ -17,16 +17,36 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ttkthemes import ThemedStyle
 from distinctipy import distinctipy
+from tkinter import filedialog
+import openpyxl
 
 app = customtkinter.CTk()
 app.geometry("1280x720")
 app.resizable(False, False)
-app.title("IMS")
+app.title("Invy")
 customtkinter.set_default_color_theme("dark-blue")
 customtkinter.set_appearance_mode("Light")
 
 
 def login_page():
+    def fetch_user_activities_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(USER_ACTIVITIES_ID) FROM USER_ACTIVITIES")
+        last_user_activities_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_user_activities_id
+
+    def generate_user_activities_id(prefix="UA"):
+        last_customer_id = fetch_user_activities_last_id()
+        if last_customer_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def login():
         name = log_user.get()
         code = log_password.get()
@@ -59,10 +79,37 @@ def login_page():
                         if level[0] == 2:
                             login_page_frame.destroy()
                             worker_dashboard(name)
+
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (name,)
+                        )
+                        fullname = cursor.fetchone()
+                        conn.commit()
+                        conn.close()
+
+                        conn = sqlite3.connect("Inventory Management System.db")
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "INSERT INTO USER_ACTIVITIES (USER_ACTIVITIES_ID,USER_ACTIVITIES_DATE,USER_ACTIVITIES,USER) \
+                        VALUES (?,?,?,?)",
+                            (
+                                generate_user_activities_id(),
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "{} logged in".format(fullname[0]),
+                                name,
+                            ),
+                        )
+                        conn.commit()
+                        conn.close()
+
+
                     else:
                         messagebox.showerror("Invalid", "Invalid Username or Password")
                 else:
                     messagebox.showerror("Invalid", "Invalid Username or Password")
+            else:
+                messagebox.showerror("Invalid", "Invalid Username or Password")
 
     login_page_frame = customtkinter.CTkFrame(
         master=app, width=1280, height=720, border_width=0
@@ -182,7 +229,6 @@ def login_page():
 
 
 def admin_dashboard(username):
-
     def fetch_to_be_packed_data():
         total_to_be_packed = 0
         conn = sqlite3.connect("Inventory Management System.db")
@@ -202,7 +248,8 @@ def admin_dashboard(username):
         total_to_be_shipped = 0
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Shipped",))
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?",
+                       ("To be Shipped",))
         to_be_shipped_data = cursor.fetchone()[0]
         total_to_be_shipped += to_be_shipped_data
         conn.commit()
@@ -217,7 +264,8 @@ def admin_dashboard(username):
         total_to_be_delivered = 0
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Delivered",))
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?",
+                       ("To be Delivered",))
         to_be_delivered_data = cursor.fetchone()[0]
         total_to_be_delivered += to_be_delivered_data
         conn.commit()
@@ -244,7 +292,9 @@ def admin_dashboard(username):
     def fetch_total_quantity_to_be_received_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?", ("To be Received",))
+        cursor.execute(
+            "SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?",
+            ("To be Received",))
         total_quantity_to_be_received = cursor.fetchone()[0]
         conn.commit()
         conn.close()
@@ -279,7 +329,9 @@ def admin_dashboard(username):
     def update_total_items_label():
         new_count = fetch_total_items_data()
         all_items_1.configure(text=str(new_count))
+
     def register():
+        fullname = reg_user_name.get()
         name = reg_user.get()
         code = reg_password.get()
         level = reg_accesslevel.get()
@@ -298,7 +350,7 @@ def admin_dashboard(username):
         cursor = conn.cursor()
         cursor.execute("SELECT USERNAME FROM USER WHERE USERNAME=?", (name,))
         existing_user = cursor.fetchone()
-        if name == "" or code == "" or confirm_code == "":
+        if fullname == "" or name == "" or code == "" or confirm_code == "":
             messagebox.showerror("Empty", "Please fill in the empty field")
         elif existing_user:
             messagebox.showerror("Invalid", "User already existed")
@@ -318,19 +370,28 @@ def admin_dashboard(username):
             )
         else:
             conn.execute(
-                "INSERT INTO USER (USERNAME,PASSWORD,ACCESSLEVEL) \
-            VALUES (?,?,?)",
-                (name, stored_password, level),
+                "INSERT INTO USER (USER_FULLNAME,USERNAME,PASSWORD,ACCESSLEVEL) \
+            VALUES (?,?,?,?)",
+                (fullname, name, stored_password, level),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Valid", "Account created")
             add_to_user_table()
 
+    def fetch_user_fullname():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,))
+        user = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return user
+
     def fetch_user_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT USERNAME, ACCESSLEVEL FROM USER")
+        cursor.execute("SELECT USER_FULLNAME, USERNAME, ACCESSLEVEL FROM USER")
         user = cursor.fetchall()
         conn.commit()
         conn.close()
@@ -460,240 +521,6 @@ def admin_dashboard(username):
             delete_user_database()
             messagebox.showinfo("Success", "Record successfully deleted")
             return
-
-    # def fetch_customer_data():
-    #     conn = sqlite3.connect("Inventory Management System.db")
-    #     cursor = conn.cursor()
-    #     cursor.execute("SELECT * FROM CUSTOMER")
-    #     customer = cursor.fetchall()
-    #     conn.commit()
-    #     conn.close()
-    #     return customer
-    #
-    # def clear_customer_entry_field():
-    #     customer_name_entry.delete(0, END)
-    #     customer_email_entry.delete(0, END)
-    #     customer_contact_entry.delete(0, END)
-    #
-    # def display_customer_record(event):
-    #     selected_item = customer_tree.focus()
-    #     if selected_item:
-    #         clear_customer_entry_field()
-    #         row = customer_tree.item(selected_item)["values"]
-    #         customer_name_entry.insert(0, row[1])
-    #         customer_email_entry.insert(0, row[2])
-    #         customer_contact_entry.insert(0, row[3])
-    #
-    # def add_to_customer_table():
-    #     customers = fetch_customer_data()
-    #     customer_tree.delete(*customer_tree.get_children())
-    #     for customer in customers:
-    #         customer_tree.insert("", END, values=customer)
-    #
-    # def check_existing_customer(customer_check):
-    #     conn = sqlite3.connect("Inventory Management System.db")
-    #     cursor = conn.cursor()
-    #     cursor.execute(
-    #         "SELECT CUSTOMER_NAME FROM CUSTOMER WHERE CUSTOMER_NAME = ?",
-    #         (customer_check,),
-    #     )
-    #     existing_customer = cursor.fetchone()
-    #     conn.commit()
-    #     conn.close()
-    #     return existing_customer
-    #
-    # def add_new_customer_details():
-    #     customer_name = customer_name_entry.get()
-    #     customer_email = customer_email_entry.get()
-    #     customer_contactno = customer_contact_entry.get()
-    #
-    #     if not (customer_name and customer_email and customer_contactno):
-    #         messagebox.showerror("Error", "Please enter all fields")
-    #         return
-    #     elif not check_existing_customer(customer_name):
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "INSERT INTO CUSTOMER (CUSTOMER_NAME,CUSTOMER_EMAIL,CUSTOMER_TEL) \
-    #         VALUES (?,?,?)",
-    #             (customer_name, customer_email, customer_contactno),
-    #         )
-    #         conn.commit()
-    #         conn.close()
-    #         messagebox.showinfo("Success", "Data has been inserted")
-    #     else:
-    #         messagebox.showerror(
-    #             "Warning", "Duplicate customer! Please enter new customer."
-    #         )
-    #     add_to_customer_table()
-    #     clear_customer_entry_field()
-    #     return
-    #
-    # def edit_customer_details():
-    #     selected_customer_details = customer_tree.focus()
-    #     if not selected_customer_details:
-    #         messagebox.showerror("Error", "Please select a record to edit")
-    #         return
-    #     row = customer_tree.item(selected_customer_details)["values"]
-    #     new_customer_name = customer_name_entry.get()
-    #     new_customer_email = customer_email_entry.get()
-    #     new_customer_contactno = customer_contact_entry.get()
-    #     if not new_customer_name:
-    #         messagebox.showerror("Error", "Please enter all fields")
-    #         return
-    #     else:
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "UPDATE CUSTOMER SET CUSTOMER_NAME = ?, CUSTOMER_EMAIL = ?, CUSTOMER_TEL = ? WHERE CUSTOMER_NAME = ?",
-    #             (new_customer_name, new_customer_email, new_customer_contactno, row[1]),
-    #         )
-    #         conn.commit()
-    #         conn.close()
-    #         messagebox.showinfo("Success", "Record successfully edited")
-    #     add_to_customer_table()
-    #     clear_customer_entry_field()
-    #
-    # def delete_customer_database():
-    #     conn = sqlite3.connect("Inventory Management System.db")
-    #     cursor = conn.cursor()
-    #     selected_item = customer_tree.focus()
-    #     row = customer_tree.item(selected_item)["values"]
-    #     cursor.execute("DELETE FROM CUSTOMER WHERE CUSTOMER_NAME= ?", (row[1],))
-    #     conn.commit()
-    #     conn.close()
-    #     add_to_customer_table()
-    #     clear_customer_entry_field()
-    #
-    # def delete_customer_record():
-    #     selected_item = customer_tree.focus()
-    #     if not selected_item:
-    #         messagebox.showerror("Error", "Please select a record to delete")
-    #         return
-    #     confirmation = messagebox.askyesno(
-    #         "Are you sure?", "Are you sure that you want to delete the selected record?"
-    #     )
-    #     if confirmation:
-    #         delete_customer_database()
-    #         messagebox.showinfo("Success", "Record successfully deleted")
-    #         return
-    #
-    # def fetch_supplier_data():
-    #     conn = sqlite3.connect("Inventory Management System.db")
-    #     cursor = conn.cursor()
-    #     cursor.execute("SELECT * FROM SUPPLIER")
-    #     supplier = cursor.fetchall()
-    #     conn.commit()
-    #     conn.close()
-    #     return supplier
-    #
-    # def add_to_supplier_table():
-    #     suppliers = fetch_supplier_data()
-    #     supplier_tree.delete(*supplier_tree.get_children())
-    #     for supplier in suppliers:
-    #         supplier_tree.insert("", END, values=supplier)
-    #
-    # def clear_supplier_entry_field():
-    #     supplier_name_entry.delete(0, END)
-    #     supplier_email_entry.delete(0, END)
-    #     supplier_contact_entry.delete(0, END)
-    #
-    # def display_supplier_record(event):
-    #     selected_item = supplier_tree.focus()
-    #     if selected_item:
-    #         clear_supplier_entry_field()
-    #         row = supplier_tree.item(selected_item)["values"]
-    #         supplier_name_entry.insert(0, row[1])
-    #         supplier_email_entry.insert(0, row[2])
-    #         supplier_contact_entry.insert(0, row[3])
-    #
-    # def check_existing_supplier(supplier_check):
-    #     conn = sqlite3.connect("Inventory Management System.db")
-    #     cursor = conn.cursor()
-    #     cursor.execute(
-    #         "SELECT SUPPLIER_NAME FROM SUPPLIER WHERE SUPPLIER_NAME = ?",
-    #         (supplier_check,),
-    #     )
-    #     existing_supplier = cursor.fetchone()
-    #     conn.commit()
-    #     conn.close()
-    #     return existing_supplier
-    #
-    # def add_new_supplier_details():
-    #     supplier_name = supplier_name_entry.get()
-    #     supplier_email = supplier_email_entry.get()
-    #     supplier_contactno = supplier_contact_entry.get()
-    #
-    #     if not (supplier_name and supplier_email and supplier_contactno):
-    #         messagebox.showerror("Error", "Please enter all fields")
-    #         return
-    #     elif not check_existing_supplier(supplier_name):
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "INSERT INTO SUPPLIER (SUPPLIER_NAME,SUPPLIER_EMAIL,SUPPLIER_TEL) \
-    #         VALUES (?,?,?)",
-    #             (supplier_name, supplier_name, supplier_contactno),
-    #         )
-    #         conn.commit()
-    #         conn.close()
-    #         messagebox.showinfo("Success", "Data has been inserted")
-    #     else:
-    #         messagebox.showerror(
-    #             "Warning", "Duplicate customer! Please enter new customer."
-    #         )
-    #     add_to_supplier_table()
-    #     clear_supplier_entry_field()
-    #     return
-    #
-    # def edit_supplier_details():
-    #     selected_supplier_details = supplier_tree.focus()
-    #     if not selected_supplier_details:
-    #         messagebox.showerror("Error", "Please select a record to edit")
-    #         return
-    #     row = supplier_tree.item(selected_supplier_details)["values"]
-    #     new_supplier_name = supplier_name_entry.get()
-    #     new_supplier_email = supplier_email_entry.get()
-    #     new_supplier_contactno = supplier_contact_entry.get()
-    #     if not new_supplier_name:
-    #         messagebox.showerror("Error", "Please enter all fields")
-    #         return
-    #     else:
-    #         conn = sqlite3.connect("Inventory Management System.db")
-    #         cursor = conn.cursor()
-    #         cursor.execute(
-    #             "UPDATE SUPPLIER SET SUPPLIER_NAME = ?, SUPPLIER_EMAIL = ?, SUPPLIER_TEL = ? WHERE SUPPLIER_NAME = ?",
-    #             (new_supplier_name, new_supplier_email, new_supplier_contactno, row[1]),
-    #         )
-    #         conn.commit()
-    #         conn.close()
-    #         messagebox.showinfo("Success", "Record successfully edited")
-    #     add_to_supplier_table()
-    #     clear_supplier_entry_field()
-    #
-    # def delete_supplier_database():
-    #     conn = sqlite3.connect("Inventory Management System.db")
-    #     cursor = conn.cursor()
-    #     selected_item = supplier_tree.focus()
-    #     row = supplier_tree.item(selected_item)["values"]
-    #     cursor.execute("DELETE FROM SUPPLIER WHERE SUPPLIER_NAME= ?", (row[1],))
-    #     conn.commit()
-    #     conn.close()
-    #     add_to_supplier_table()
-    #     clear_supplier_entry_field()
-    #
-    # def delete_supplier_record():
-    #     selected_item = supplier_tree.focus()
-    #     if not selected_item:
-    #         messagebox.showerror("Error", "Please select a record to delete")
-    #         return
-    #     confirmation = messagebox.askyesno(
-    #         "Are you sure?", "Are you sure that you want to delete the selected record?"
-    #     )
-    #     if confirmation:
-    #         delete_supplier_database()
-    #         messagebox.showinfo("Success", "Record successfully deleted")
-    #         return
 
     def fetch_product_data():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -881,7 +708,6 @@ def admin_dashboard(username):
 
         new_window = customtkinter.CTk()
         new_window.title("Product Details")
-        # new_window.geometry("500x400")
 
         def add_incoming_stock():
             incoming_stock_id = generate_purchase_order_id("PO")
@@ -1100,7 +926,7 @@ def admin_dashboard(username):
         tv.heading(col, command=lambda: sort_treeview_column(tv, col, not reverse))
 
     def low_stock_vs_total_item_pie_chart(canvas):
-        data=[]
+        data = []
 
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -1158,6 +984,97 @@ def admin_dashboard(username):
         canvas.figure = fig1
         canvas.draw()
 
+    def fetch_user_activities_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(USER_ACTIVITIES_ID) FROM USER_ACTIVITIES")
+        last_user_activities_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_user_activities_id
+
+    def generate_user_activities_id(prefix="UA"):
+        last_customer_id = fetch_user_activities_last_id()
+        if last_customer_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
+    def fetch_user_activities_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM USER_ACTIVITIES")
+        data = cursor.fetchall()
+        conn.commit()
+        conn.close()
+        return data
+
+    def add_to_user_activities_table():
+        user_activities = fetch_user_activities_data()
+        user_activities_tree.delete(*user_activities_tree.get_children())
+        for user_activity in user_activities:
+            user_activities_tree.insert("", END, values=user_activity)
+
+    def search_user_activities(event):
+        search_term = search_user_activities_entry.get().lower()
+        user_activities = fetch_user_activities_data()
+        user_activities_tree.delete(*user_activities_tree.get_children())
+        for user_activity in user_activities:
+            if search_term in str(user_activity).lower():
+                user_activities_tree.insert("", tk.END, values=user_activity)
+
+    def export_to_excel(treeview):
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Treeview Data"
+
+        for col_index, col in enumerate(treeview["columns"], start=1):
+            ws.cell(row=1, column=col_index, value=col)
+
+        for row_index, row in enumerate(treeview.get_children(), start=2):
+            for col_index, col in enumerate(treeview["columns"], start=1):
+                ws.cell(row=row_index, column=col_index, value=treeview.item(row, "values")[col_index - 1])
+
+        file_path = filedialog.asksaveasfilename(defaultextension=".xlsx",
+                                                 filetypes=[("Excel files", "*.xlsx"),
+                                                            ("All files", "*.*")])
+        if file_path:
+            wb.save(file_path)
+            print(f"Data exported to {file_path}")
+
+    def logout():
+        confirmation = messagebox.askyesno('Are you sure?', 'Are you sure that you want to logout?')
+        if confirmation:
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+            )
+            fullname = cursor.fetchone()
+            conn.commit()
+            conn.close()
+
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO USER_ACTIVITIES (USER_ACTIVITIES_ID,USER_ACTIVITIES_DATE,USER_ACTIVITIES,USER) \
+            VALUES (?,?,?,?)",
+                (
+                    generate_user_activities_id(),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "{} logged out".format(fullname[0]),
+                    username,
+                ),
+            )
+            conn.commit()
+            conn.close()
+
+            admin_dashboard_frame.destroy()
+            login_page()
+
     admin_dashboard_frame = customtkinter.CTkFrame(
         master=app, width=1280, height=720, border_width=0
     )
@@ -1176,8 +1093,19 @@ def admin_dashboard(username):
 
     welcome_label = customtkinter.CTkLabel(
         master=tab_0,
-        text=f"Hello, {username} ",
+        text=f"Hello, {fetch_user_fullname()} ",
         font=customtkinter.CTkFont("SF Pro Display", 24, weight="bold"),
+    )
+
+    logout_btn = customtkinter.CTkButton(
+        master=tab_0,
+        text="Logout",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=logout,
+        compound="top",
+        corner_radius=200,
+        fg_color="#ff666d",
+        text_color="black",
     )
 
     sales_activity_frame = customtkinter.CTkFrame(
@@ -1323,6 +1251,7 @@ def admin_dashboard(username):
     )
 
     welcome_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+    logout_btn.grid(row=0, column=1, sticky=E, padx=10, pady=10, columnspan=2)
     sales_activity_frame.grid(row=1, column=0, padx=10, pady=10)
     inventory_summary_frame.grid(row=1, column=1, padx=10, pady=10)
     product_details_frame.grid(row=1, column=2, padx=10, pady=10)
@@ -1337,8 +1266,7 @@ def admin_dashboard(username):
     canvas1.get_tk_widget().grid(row=2, column=1, padx=10, pady=10, columnspan=2)
     bar_chart(canvas1)
 
-
-    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     total_to_be_packed_label_1.grid(row=1, column=0, padx=20, pady=5)
     total_to_be_packed_label_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -1349,7 +1277,7 @@ def admin_dashboard(username):
     total_to_be_delivered_label_2.grid(row=2, column=4, padx=20, pady=5)
     # sales_activity_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
 
-    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     total_quantity_in_hand_1.grid(row=1, column=0, padx=20, pady=5)
     total_quantity_in_hand_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_4.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -1357,7 +1285,7 @@ def admin_dashboard(username):
     total_quantity_to_be_received_2.grid(row=2, column=2, padx=20, pady=5)
     # sales_activity_vertical_separator_5.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
 
-    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     low_stock_items_1.grid(row=1, column=0, padx=20, pady=5)
     low_stock_items_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_6.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -1370,7 +1298,7 @@ def admin_dashboard(username):
     user_table_frame = customtkinter.CTkFrame(master=tab_1, width=780, height=645)
     user_table_frame.place(x=430, y=20)
 
-    user_tree = ttk.Treeview(master=user_table_frame, height=23)
+    user_tree = ttk.Treeview(master=user_table_frame, height=25)
 
     user_verscrlbar = customtkinter.CTkScrollbar(
         master=user_table_frame, orientation="vertical", command=user_tree.yview
@@ -1379,14 +1307,17 @@ def admin_dashboard(username):
 
     user_tree.configure(yscrollcommand=user_verscrlbar.set)
     user_tree["columns"] = (
+        "FULLNAME",
         "USERNAME",
         "ACCESSLEVEL",
     )
 
     user_tree.column("#0", width=0, stretch=tk.NO)
-    user_tree.column("USERNAME", anchor=tk.CENTER, width=385)
-    user_tree.column("ACCESSLEVEL", anchor=tk.CENTER, width=385)
+    user_tree.column("FULLNAME", anchor=tk.CENTER, width=260)
+    user_tree.column("USERNAME", anchor=tk.CENTER, width=260)
+    user_tree.column("ACCESSLEVEL", anchor=tk.CENTER, width=260)
 
+    user_tree.heading("FULLNAME", text="Full Name")
     user_tree.heading("USERNAME", text="Username")
     user_tree.heading("ACCESSLEVEL", text="Access Level")
 
@@ -1400,6 +1331,17 @@ def admin_dashboard(username):
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
 
+    reg_user_name = customtkinter.CTkEntry(
+        master=tab_1,
+        placeholder_text="Full Name",
+        width=300,
+        height=30,
+        font=customtkinter.CTkFont("SF Pro Display"),
+        border_width=0,
+    )
+    app.update()
+    reg_user_name.focus_set()
+
     reg_user = customtkinter.CTkEntry(
         master=tab_1,
         placeholder_text="Username",
@@ -1408,8 +1350,6 @@ def admin_dashboard(username):
         font=customtkinter.CTkFont("SF Pro Display"),
         border_width=0,
     )
-    app.update()
-    reg_user.focus_set()
 
     reg_password = customtkinter.CTkEntry(
         master=tab_1,
@@ -1467,12 +1407,13 @@ def admin_dashboard(username):
     )
 
     register_new_user_label.grid(row=0, column=0, padx=30, pady=10, sticky="w")
-    reg_user.grid(row=1, column=0, padx=30, pady=10, sticky="w")
-    reg_password.grid(row=2, column=0, padx=30, pady=10, sticky="w")
-    reg_confirm_password.grid(row=3, column=0, padx=30, pady=10, sticky="w")
-    reg_accesslevel.grid(row=4, column=0, padx=30, pady=10, sticky="w")
-    reg_btn.grid(row=5, column=0, padx=30, pady=10, sticky="ns")
-    dlt_user_btn.grid(row=6, column=0, padx=30, pady=10, sticky="ns")
+    reg_user_name.grid(row=1, column=0, padx=30, pady=10, sticky="w")
+    reg_user.grid(row=2, column=0, padx=30, pady=10, sticky="w")
+    reg_password.grid(row=3, column=0, padx=30, pady=10, sticky="w")
+    reg_confirm_password.grid(row=4, column=0, padx=30, pady=10, sticky="w")
+    reg_accesslevel.grid(row=5, column=0, padx=30, pady=10, sticky="w")
+    reg_btn.grid(row=6, column=0, padx=30, pady=10, sticky="ns")
+    dlt_user_btn.grid(row=7, column=0, padx=30, pady=10, sticky="ns")
 
     style = ThemedStyle()
     style.set_theme("equilux")
@@ -1537,8 +1478,8 @@ def admin_dashboard(username):
     product_tree.bind("<Double-1>", on_product_double_click)
     product_tree.bind("<ButtonRelease>", display_product_record)
 
-    search_entry = customtkinter.CTkEntry(tab_4,placeholder_text="Search", width=1050,)
-    search_entry.grid(row=1,column=0, padx=10, pady=10)
+    search_entry = customtkinter.CTkEntry(tab_4, placeholder_text="Search", width=1050, )
+    search_entry.grid(row=1, column=0, padx=10, pady=10)
     search_entry.bind("<KeyRelease>", search_product)
 
     product_menu_frame = customtkinter.CTkFrame(
@@ -1661,11 +1602,7 @@ def admin_dashboard(username):
     )
 
     product_menu_frame.grid(row=0, column=0)
-
-    insert_product_data_label.grid(
-        row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2
-    )
-
+    insert_product_data_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
     product_id_entry_label.grid(row=1, column=0, padx=5)
     product_id_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
     product_name_entry_label.grid(row=1, column=2, padx=5)
@@ -1681,13 +1618,86 @@ def admin_dashboard(username):
     editproduct_btn.grid(row=3, column=2, padx=20, pady=5, columnspan=2)
     deleteproduct_btn.grid(row=3, column=4, padx=20, pady=5, columnspan=2)
 
-    tab_4.columnconfigure(0,weight=1)
+    tab_4.columnconfigure(0, weight=1)
+
+    user_activities_table_frame = customtkinter.CTkFrame(master=tab_5, width=1280, height=515)
+    user_activities_table_frame.place(x=0, y=205)
+
+    user_activities_tree = ttk.Treeview(master=user_activities_table_frame, height=20)
+
+    product_verscrlbar = customtkinter.CTkScrollbar(
+        master=user_activities_table_frame, orientation="vertical", command=user_activities_tree.yview
+    )
+    product_verscrlbar.pack(side="right", fill="y")
+
+    user_activities_tree.configure(yscrollcommand=product_verscrlbar.set)
+    user_activities_tree["columns"] = (
+        "USER ACTIVITIES ID",
+        "USER ACTIVITIES DATE",
+        "USER ACTIVITIES",
+        "USER ACTIVITIES USERNAME"
+    )
+
+    user_activities_tree.column("#0", width=0, stretch=tk.NO)
+    user_activities_tree.column("USER ACTIVITIES ID", anchor=tk.CENTER, width=313)
+    user_activities_tree.column("USER ACTIVITIES DATE", anchor=tk.CENTER, width=313)
+    user_activities_tree.column("USER ACTIVITIES", anchor=tk.CENTER, width=313)
+    user_activities_tree.column("USER ACTIVITIES USERNAME", anchor=tk.CENTER, width=313)
+
+    user_activities_tree.heading("USER ACTIVITIES ID", text="ID")
+    user_activities_tree.heading("USER ACTIVITIES DATE", text="Date")
+    user_activities_tree.heading("USER ACTIVITIES", text="Description")
+    user_activities_tree.heading("USER ACTIVITIES USERNAME", text="User")
+
+    user_activities_tree.pack(side="bottom", fill="both")
+
+    user_activities_menu_frame = customtkinter.CTkFrame(
+        master=tab_5,
+        border_width=2
+    )
+
+    user_activities_menu_label = customtkinter.CTkLabel(
+        master=user_activities_menu_frame,
+        text="Export to Excel Sheet",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
+    )
+
+    export_user_activities_btn = customtkinter.CTkButton(
+        master=user_activities_menu_frame,
+        text="Export",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=lambda: export_to_excel(user_activities_tree),
+        compound="top",
+        corner_radius=200,
+        fg_color="#ADD8E6",
+        text_color="black",
+    )
+
+    search_user_activities_entry = customtkinter.CTkEntry(tab_5, placeholder_text="Search", width=1050, )
+    search_user_activities_entry.grid(row=1, column=0, padx=10, pady=10)
+    search_user_activities_entry.bind("<KeyRelease>", search_user_activities)
+
+    user_activities_menu_frame.grid(row=0, column=0)
+    user_activities_menu_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
+    export_user_activities_btn.grid(row=1, column=0, padx=20, pady=5, columnspan=2)
+
+    tab_5.columnconfigure(0, weight=1)
 
     add_to_user_table()
     add_to_product_table()
+    add_to_user_activities_table()
 
 
 def supervisor_dashboard(username):
+    def fetch_user_fullname():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,))
+        user = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return user
+
     def fetch_to_be_packed_data():
         total_to_be_packed = 0
         conn = sqlite3.connect("Inventory Management System.db")
@@ -1707,7 +1717,8 @@ def supervisor_dashboard(username):
         total_to_be_shipped = 0
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Shipped",))
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?",
+                       ("To be Shipped",))
         to_be_shipped_data = cursor.fetchone()[0]
         total_to_be_shipped += to_be_shipped_data
         conn.commit()
@@ -1722,7 +1733,8 @@ def supervisor_dashboard(username):
         total_to_be_delivered = 0
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Delivered",))
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?",
+                       ("To be Delivered",))
         to_be_delivered_data = cursor.fetchone()[0]
         total_to_be_delivered += to_be_delivered_data
         conn.commit()
@@ -1749,7 +1761,9 @@ def supervisor_dashboard(username):
     def fetch_total_quantity_to_be_received_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?", ("To be Received",))
+        cursor.execute(
+            "SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?",
+            ("To be Received",))
         total_quantity_to_be_received = cursor.fetchone()[0]
         conn.commit()
         conn.close()
@@ -1985,7 +1999,7 @@ def supervisor_dashboard(username):
             cursor.execute(
                 "INSERT INTO SALE_ORDER (SALE_ORDER_ID,SALE_ORDER_DATE,SALE_ORDER_CUSTOMER,SALE_ORDER_STATUS) \
             VALUES (?,?,?,?)",
-                (sale_order_id, sale_order_date, customer_name, "To be packed"),
+                (sale_order_id, sale_order_date, customer_name, "To be Packed"),
             )
             conn.commit()
             conn.close()
@@ -2445,6 +2459,7 @@ def supervisor_dashboard(username):
 
         new_window = customtkinter.CTk()
         new_window.title("Product Details")
+
         # new_window.geometry("500x400")
 
         def add_incoming_stock():
@@ -2882,7 +2897,6 @@ def supervisor_dashboard(username):
         update_low_stock_item_label()
         update_total_items_label()
 
-
     def fetch_sale_order_last_id():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -2923,6 +2937,7 @@ def supervisor_dashboard(username):
             status = cursor.fetchone()
             conn.close()
             return status[0] if status else None
+
         def fetch_sale_order_product_data():
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
@@ -3096,7 +3111,7 @@ def supervisor_dashboard(username):
         sale_order_window.mainloop()
 
     def low_stock_vs_total_item_pie_chart(canvas):
-        data=[]
+        data = []
 
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -3154,6 +3169,53 @@ def supervisor_dashboard(username):
         canvas.figure = fig1
         canvas.draw()
 
+    def fetch_user_activities_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(USER_ACTIVITIES_ID) FROM USER_ACTIVITIES")
+        last_user_activities_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_user_activities_id
+
+    def generate_user_activities_id(prefix="UA"):
+        last_customer_id = fetch_user_activities_last_id()
+        if last_customer_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
+    def logout():
+        confirmation = messagebox.askyesno('Are you sure?', 'Are you sure that you want to logout?')
+        if confirmation:
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+            )
+            fullname = cursor.fetchone()
+            conn.commit()
+            conn.close()
+
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO USER_ACTIVITIES (USER_ACTIVITIES_ID,USER_ACTIVITIES_DATE,USER_ACTIVITIES,USER) \
+            VALUES (?,?,?,?)",
+                (
+                    generate_user_activities_id(),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "{} logged out".format(fullname[0]),
+                    username,
+                ),
+            )
+            conn.commit()
+            conn.close()
+
+            supervisor_dashboard_frame.destroy()
+            login_page()
 
     def sort_treeview_column(tv, col, reverse):
         l = [(tv.set(k, col), k) for k in tv.get_children('')]
@@ -3212,8 +3274,19 @@ def supervisor_dashboard(username):
 
     welcome_label = customtkinter.CTkLabel(
         master=tab_0,
-        text=f"Hello, {username} ",
+        text=f"Hello, {fetch_user_fullname()} ",
         font=customtkinter.CTkFont("SF Pro Display", 24, weight="bold"),
+    )
+
+    logout_btn = customtkinter.CTkButton(
+        master=tab_0,
+        text="Logout",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=logout,
+        compound="top",
+        corner_radius=200,
+        fg_color="#ff666d",
+        text_color="black",
     )
 
     sales_activity_frame = customtkinter.CTkFrame(
@@ -3359,6 +3432,7 @@ def supervisor_dashboard(username):
     )
 
     welcome_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+    logout_btn.grid(row=0, column=1, sticky=E, padx=10, pady=10, columnspan=2)
     sales_activity_frame.grid(row=1, column=0, padx=10, pady=10)
     inventory_summary_frame.grid(row=1, column=1, padx=10, pady=10)
     product_details_frame.grid(row=1, column=2, padx=10, pady=10)
@@ -3374,7 +3448,7 @@ def supervisor_dashboard(username):
     canvas1.get_tk_widget().grid(row=2, column=1, padx=10, pady=10, columnspan=2)
     bar_chart(canvas1)
 
-    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     total_to_be_packed_label_1.grid(row=1, column=0, padx=20, pady=5)
     total_to_be_packed_label_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -3385,7 +3459,7 @@ def supervisor_dashboard(username):
     total_to_be_delivered_label_2.grid(row=2, column=4, padx=20, pady=5)
     # sales_activity_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
 
-    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     total_quantity_in_hand_1.grid(row=1, column=0, padx=20, pady=5)
     total_quantity_in_hand_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_4.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -3393,7 +3467,7 @@ def supervisor_dashboard(username):
     total_quantity_to_be_received_2.grid(row=2, column=2, padx=20, pady=5)
     # sales_activity_vertical_separator_5.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
 
-    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     low_stock_items_1.grid(row=1, column=0, padx=20, pady=5)
     low_stock_items_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_6.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -3716,8 +3790,8 @@ def supervisor_dashboard(username):
     product_tree.bind("<Double-1>", on_product_double_click)
     product_tree.bind("<ButtonRelease>", display_product_record)
 
-    search_entry = customtkinter.CTkEntry(tab_3,placeholder_text="Search", width=1050,)
-    search_entry.grid(row=1,column=0, padx=10, pady=10)
+    search_entry = customtkinter.CTkEntry(tab_3, placeholder_text="Search", width=1050,)
+    search_entry.grid(row=1, column=0, padx=10, pady=10)
     search_entry.bind("<KeyRelease>", search_product)
 
     product_menu_frame = customtkinter.CTkFrame(
@@ -4164,6 +4238,14 @@ def supervisor_dashboard(username):
 
 
 def worker_dashboard(username):
+    def fetch_user_fullname():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,))
+        user = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return user
 
     def fetch_to_be_packed_data():
         total_to_be_packed = 0
@@ -4184,7 +4266,8 @@ def worker_dashboard(username):
         total_to_be_shipped = 0
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Shipped",))
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?",
+                       ("To be Shipped",))
         to_be_shipped_data = cursor.fetchone()[0]
         total_to_be_shipped += to_be_shipped_data
         conn.commit()
@@ -4199,7 +4282,8 @@ def worker_dashboard(username):
         total_to_be_delivered = 0
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?", ("To be Delivered",))
+        cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ?",
+                       ("To be Delivered",))
         to_be_delivered_data = cursor.fetchone()[0]
         total_to_be_delivered += to_be_delivered_data
         conn.commit()
@@ -4226,7 +4310,9 @@ def worker_dashboard(username):
     def fetch_total_quantity_to_be_received_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute("SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?", ("To be Received",))
+        cursor.execute(
+            "SELECT SUM(PURCHASE_ORDER_PRODUCT_QUANTITY) FROM PURCHASE_ORDER WHERE PURCHASE_ORDER_STATUS = ?",
+            ("To be Received",))
         total_quantity_to_be_received = cursor.fetchone()[0]
         conn.commit()
         conn.close()
@@ -4261,6 +4347,7 @@ def worker_dashboard(username):
     def update_total_items_label():
         new_count = fetch_total_items_data()
         all_items_1.configure(text=str(new_count))
+
     def fetch_customer_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -4461,7 +4548,7 @@ def worker_dashboard(username):
             cursor.execute(
                 "INSERT INTO SALE_ORDER (SALE_ORDER_ID,SALE_ORDER_DATE,SALE_ORDER_CUSTOMER,SALE_ORDER_STATUS) \
             VALUES (?,?,?,?)",
-                (sale_order_id, sale_order_date, customer_name, "To be packed"),
+                (sale_order_id, sale_order_date, customer_name, "To be Packed"),
             )
             conn.commit()
             conn.close()
@@ -4921,6 +5008,7 @@ def worker_dashboard(username):
 
         new_window = customtkinter.CTk()
         new_window.title("Product Details")
+
         # new_window.geometry("500x400")
 
         def add_incoming_stock():
@@ -5535,9 +5623,8 @@ def worker_dashboard(username):
         add_to_sale_order_product_table()
         sale_order_window.mainloop()
 
-
     def low_stock_vs_total_item_pie_chart(canvas):
-        data=[]
+        data = []
 
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -5594,6 +5681,54 @@ def worker_dashboard(username):
 
         canvas.figure = fig1
         canvas.draw()
+
+    def fetch_user_activities_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(USER_ACTIVITIES_ID) FROM USER_ACTIVITIES")
+        last_user_activities_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_user_activities_id
+
+    def generate_user_activities_id(prefix="UA"):
+        last_customer_id = fetch_user_activities_last_id()
+        if last_customer_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
+    def logout():
+        confirmation = messagebox.askyesno('Are you sure?', 'Are you sure that you want to logout?')
+        if confirmation:
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+            )
+            fullname = cursor.fetchone()
+            conn.commit()
+            conn.close()
+
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO USER_ACTIVITIES (USER_ACTIVITIES_ID,USER_ACTIVITIES_DATE,USER_ACTIVITIES,USER) \
+            VALUES (?,?,?,?)",
+                (
+                    generate_user_activities_id(),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "{} logged out".format(fullname[0]),
+                    username,
+                ),
+            )
+            conn.commit()
+            conn.close()
+
+            worker_dashboard_frame.destroy()
+            login_page()
 
     def sort_treeview_column(tv, col, reverse):
         l = [(tv.set(k, col), k) for k in tv.get_children('')]
@@ -5652,8 +5787,19 @@ def worker_dashboard(username):
 
     welcome_label = customtkinter.CTkLabel(
         master=tab_0,
-        text=f"Hello, {username} ",
+        text=f"Hello, {fetch_user_fullname()} ",
         font=customtkinter.CTkFont("SF Pro Display", 24, weight="bold"),
+    )
+
+    logout_btn = customtkinter.CTkButton(
+        master=tab_0,
+        text="Logout",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=logout,
+        compound="top",
+        corner_radius=200,
+        fg_color="#ff666d",
+        text_color="black",
     )
 
     sales_activity_frame = customtkinter.CTkFrame(
@@ -5799,6 +5945,7 @@ def worker_dashboard(username):
     )
 
     welcome_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
+    logout_btn.grid(row=0, column=1, sticky=E, padx=10, pady=10, columnspan=2)
     sales_activity_frame.grid(row=1, column=0, padx=10, pady=10)
     inventory_summary_frame.grid(row=1, column=1, padx=10, pady=10)
     product_details_frame.grid(row=1, column=2, padx=10, pady=10)
@@ -5814,8 +5961,7 @@ def worker_dashboard(username):
     canvas1.get_tk_widget().grid(row=2, column=1, padx=10, pady=10, columnspan=2)
     bar_chart(canvas1)
 
-
-    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    sales_activity_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     total_to_be_packed_label_1.grid(row=1, column=0, padx=20, pady=5)
     total_to_be_packed_label_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -5826,7 +5972,7 @@ def worker_dashboard(username):
     total_to_be_delivered_label_2.grid(row=2, column=4, padx=20, pady=5)
     # sales_activity_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
 
-    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    inventory_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     total_quantity_in_hand_1.grid(row=1, column=0, padx=20, pady=5)
     total_quantity_in_hand_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_4.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -5834,7 +5980,7 @@ def worker_dashboard(username):
     total_quantity_to_be_received_2.grid(row=2, column=2, padx=20, pady=5)
     # sales_activity_vertical_separator_5.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
 
-    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10,columnspan=2)
+    product_details_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     low_stock_items_1.grid(row=1, column=0, padx=20, pady=5)
     low_stock_items_2.grid(row=2, column=0, padx=20, pady=5)
     sales_activity_vertical_separator_6.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
@@ -6157,8 +6303,8 @@ def worker_dashboard(username):
     product_tree.bind("<Double-1>", on_product_double_click)
     product_tree.bind("<ButtonRelease>", display_product_record)
 
-    search_entry = customtkinter.CTkEntry(tab_3,placeholder_text="Search", width=1050,)
-    search_entry.grid(row=1,column=0, padx=10, pady=10)
+    search_entry = customtkinter.CTkEntry(tab_3, placeholder_text="Search", width=1050, )
+    search_entry.grid(row=1, column=0, padx=10, pady=10)
     search_entry.bind("<KeyRelease>", search_product)
 
     product_menu_frame = customtkinter.CTkFrame(
@@ -6511,8 +6657,8 @@ def worker_dashboard(username):
     add_to_sale_order_table()
 
 
-login_page()
-#admin_dashboard("admin")
+#login_page()
+admin_dashboard("admin")
 #supervisor_dashboard("supervisor")
 #worker_dashboard("worker1")
 app.mainloop()
