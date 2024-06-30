@@ -447,10 +447,11 @@ def admin_dashboard(username):
                 cursor = conn.cursor()
                 cursor.execute(
                     "UPDATE USER SET PASSWORD = ? WHERE USERNAME = ?",
-                    (stored_password, values[0]),
+                    (stored_password, values[1]),
                 )
                 conn.commit()
                 conn.close()
+                messagebox.showinfo("Success", "New Password updated!")
                 change_pw_window.destroy()
 
         change_pw_title = customtkinter.CTkLabel(
@@ -632,6 +633,19 @@ def admin_dashboard(username):
                         generate_user_activities_id(),
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "{} added new product: {} with ID: {}".format(fullname[0], product_name, product_id),
+                        username,
+                    ),
+                )
+                conn.commit()
+
+                # Log the product movement
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Added product: {} with ID: {} by {} to warehouse".format(product_name, product_id, fullname[0]),
                         username,
                     ),
                 )
@@ -1140,6 +1154,24 @@ def admin_dashboard(username):
             new_number = int(number_part) + 1
             return f"{prefix}-{new_number:03d}"
 
+    def fetch_product_movement_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(PRODUCT_MOVEMENT_ID) FROM PRODUCT_MOVEMENT")
+        last_product_movement_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_product_movement_id
+
+    def generate_product_movement_id(prefix="PM"):
+        product_movement_id = fetch_product_movement_last_id()
+        if product_movement_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(product_movement_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
     def fetch_user_activities_data():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
@@ -1162,6 +1194,37 @@ def admin_dashboard(username):
         for user_activity in user_activities:
             if search_term in str(user_activity).lower():
                 user_activities_tree.insert("", tk.END, values=user_activity)
+
+    def search_product_movement(event):
+        search_term = search_product_movement_entry.get().lower()
+        product_movements = fetch_product_movement_data()
+        product_movement_tree.delete(*product_movement_tree.get_children())
+        for product_movement in product_movements:
+            if search_term in str(product_movement).lower():
+                product_movement_tree.insert("", tk.END, values=product_movement)
+
+    def fetch_product_movement_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM PRODUCT_MOVEMENT")
+        data = cursor.fetchall()
+        conn.commit()
+        conn.close()
+        return data
+
+    def add_to_product_movement_table():
+        product_movements = fetch_product_movement_data()
+        product_movement_tree.delete(*product_movement_tree.get_children())
+        for product_movement in product_movements:
+            product_movement_tree.insert("", END, values=product_movement)
+
+    # def search_product_movement(event):
+    #     search_term = search_user_activities_entry.get().lower()
+    #     user_activities = fetch_user_activities_data()
+    #     user_activities_tree.delete(*user_activities_tree.get_children())
+    #     for user_activity in user_activities:
+    #         if search_term in str(user_activity).lower():
+    #             user_activities_tree.insert("", tk.END, values=user_activity)
 
     def export_to_excel(treeview):
 
@@ -1887,9 +1950,85 @@ def admin_dashboard(username):
 
     tab_5.columnconfigure(0, weight=1)
 
+    product_movement_table_frame = customtkinter.CTkFrame(master=tab_6, width=1280, height=515)
+    product_movement_table_frame.place(x=0, y=205)
+
+    product_movement_tree = ttk.Treeview(master=product_movement_table_frame, height=20)
+
+    product_verscrlbar = customtkinter.CTkScrollbar(
+        master=product_movement_table_frame, orientation="vertical", command=product_movement_tree.yview
+    )
+    product_verscrlbar.pack(side="right", fill="y")
+
+    product_movement_tree.configure(yscrollcommand=product_verscrlbar.set)
+    product_movement_tree["columns"] = (
+        "PRODUCT MOVEMENT ID",
+        "PRODUCT MOVEMENT DATE",
+        "PRODUCT MOVEMENT",
+        "USER"
+    )
+
+    product_movement_tree.column("#0", width=0, stretch=tk.NO)
+    product_movement_tree.column("PRODUCT MOVEMENT ID", anchor=tk.CENTER, width=313)
+    product_movement_tree.column("PRODUCT MOVEMENT DATE", anchor=tk.CENTER, width=313)
+    product_movement_tree.column("PRODUCT MOVEMENT", anchor=tk.CENTER, width=313)
+    product_movement_tree.column("USER", anchor=tk.CENTER, width=313)
+
+    product_movement_tree.heading("PRODUCT MOVEMENT ID", text="ID")
+    product_movement_tree.heading("PRODUCT MOVEMENT DATE", text="Date")
+    product_movement_tree.heading("PRODUCT MOVEMENT", text="Description")
+    product_movement_tree.heading("USER", text="User")
+
+    product_movement_tree.pack(side="bottom", fill="both")
+
+    product_movement_menu_frame = customtkinter.CTkFrame(
+        master=tab_6,
+        border_width=2
+    )
+
+    product_movement_menu_label = customtkinter.CTkLabel(
+        master=product_movement_menu_frame,
+        text="Export to Excel Sheet",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
+    )
+
+    export_product_movement_btn = customtkinter.CTkButton(
+        master=product_movement_menu_frame,
+        text="Export Excel",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=lambda: export_to_excel(product_movement_tree),
+        compound="top",
+        corner_radius=200,
+        fg_color="#ADD8E6",
+        text_color="black",
+    )
+
+    export_product_movement_pdf_btn = customtkinter.CTkButton(
+        master=product_movement_menu_frame,
+        text="Export PDF",
+        font=customtkinter.CTkFont("SF Pro Display"),
+        command=lambda: export_to_pdf(product_movement_tree),
+        compound="top",
+        corner_radius=200,
+        fg_color="#ADD8E6",
+        text_color="black",
+    )
+
+    search_product_movement_entry = customtkinter.CTkEntry(tab_6, placeholder_text="Search", width=1050, )
+    search_product_movement_entry.grid(row=1, column=0, padx=10, pady=10)
+    search_product_movement_entry.bind("<KeyRelease>", search_product_movement)
+
+    product_movement_menu_frame.grid(row=0, column=0)
+    product_movement_menu_label.grid(row=0, column=0, sticky="w", padx=5, pady=5, columnspan=2)
+    export_product_movement_btn.grid(row=1, column=0, padx=20, pady=5, columnspan=2)
+    export_product_movement_pdf_btn.grid(row=2, column=0, padx=20, pady=5, columnspan=2)
+
+    tab_6.columnconfigure(0, weight=1)
+
     add_to_user_table()
     add_to_product_table()
     add_to_user_activities_table()
+    add_to_product_movement_table()
 
 
 def supervisor_dashboard(username):
@@ -2800,6 +2939,19 @@ def supervisor_dashboard(username):
                 )
                 conn.commit()
 
+                # Log the product movement
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Added product: {} with ID: {} by {} to warehouse".format(product_name, product_id, fullname[0]),
+                        username,
+                    ),
+                )
+                conn.commit()
+
             except Exception as e:
                 messagebox.showerror("Error", str(e))
             finally:
@@ -3019,19 +3171,47 @@ def supervisor_dashboard(username):
 
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO PURCHASE_ORDER (PURCHASE_ORDER_ID,PURCHASE_ORDER_PRODUCT,PURCHASE_ORDER_PRODUCT_QUANTITY,PURCHASE_ORDER_STATUS) \
-            VALUES (?,?,?,?)",
-                (
-                    incoming_stock_id,
-                    incoming_stock_product,
-                    incoming_stock_quantity,
-                    incoming_stock_status,
-                ),
-            )
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", "Data has been inserted")
+
+            try:
+                cursor.execute(
+                    "INSERT INTO PURCHASE_ORDER (PURCHASE_ORDER_ID, PURCHASE_ORDER_PRODUCT, PURCHASE_ORDER_PRODUCT_QUANTITY, PURCHASE_ORDER_STATUS) \
+                    VALUES (?,?,?,?)",
+                    (
+                        incoming_stock_id,
+                        incoming_stock_product,
+                        incoming_stock_quantity,
+                        incoming_stock_status,
+                    ),
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Data has been inserted")
+
+                # Retrieve the user's full name
+                cursor.execute(
+                    "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+                )
+                fullname = cursor.fetchone()
+
+                # Log the product movement
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "{} added incoming stock for product: {} with quantity: {}".format(fullname[0],
+                                                                                           incoming_stock_product,
+                                                                                           incoming_stock_quantity),
+                        username,
+                    ),
+                )
+                conn.commit()
+
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+            finally:
+                conn.close()
+
             add_to_incoming_stock_table()
             fetch_tbr_quantity()
             update_total_quantity_in_hand_label()
@@ -3218,7 +3398,7 @@ def supervisor_dashboard(username):
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT TASK_ID,TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE FROM TASK"
+            "SELECT TASK_ID,TASK_ASSIGN_DATE, TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE, TASK_FINISH_DATE FROM TASK"
         )
         task = cursor.fetchall()
         conn.commit()
@@ -3267,9 +3447,10 @@ def supervisor_dashboard(username):
 
     def add_new_task_details():
         task_id = generate_task_id("TASK")
+        task_assigned_date = datetime.today().date()
         task_name = task_entry.get()
         assigned_worker = assigned_worker_entry.get()
-        task_due_date = task_due_date_entry.get()
+        task_due_date = task_due_date_entry.get_date()
 
         if not (task_name):
             messagebox.showerror("Error", "Please enter all fields")
@@ -3278,9 +3459,9 @@ def supervisor_dashboard(username):
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO TASK (TASK_ID,TASK_DESCRIPTION,TASK_ASSIGNED_TO,TASK_STATUS,TASK_DUE_DATE) \
-            VALUES (?,?,?,?,?)",
-                (task_id, task_name, assigned_worker, "Pending", task_due_date),
+                "INSERT INTO TASK (TASK_ID, TASK_ASSIGN_DATE, TASK_DESCRIPTION, TASK_ASSIGNED_TO, TASK_STATUS, TASK_DUE_DATE) \
+            VALUES (?,?,?,?,?,?)",
+                (task_id, task_assigned_date, task_name, assigned_worker, "Pending", task_due_date),
             )
             conn.commit()
             conn.close()
@@ -3296,7 +3477,7 @@ def supervisor_dashboard(username):
         row = task_tree.item(selected_task_details)["values"]
         new_task = task_entry.get()
         new_assigned_worker = assigned_worker_entry.get()
-        new_due_date = task_due_date_entry.get()
+        new_due_date = task_due_date_entry.get_date()
         if not new_task:
             messagebox.showerror("Error", "Please enter all fields")
             return
@@ -3317,7 +3498,7 @@ def supervisor_dashboard(username):
         cursor = conn.cursor()
         selected_item = task_tree.focus()
         row = task_tree.item(selected_item)["values"]
-        cursor.execute("DELETE FROM TASK WHERE TASK_DESCRIPTION= ?", (row[0],))
+        cursor.execute("DELETE FROM TASK WHERE TASK_ID= ?", (row[0],))
         conn.commit()
         conn.close()
         add_to_task_table()
@@ -3384,21 +3565,50 @@ def supervisor_dashboard(username):
         if not selected:
             messagebox.showerror("Error", "Please select a record to edit")
             return
+
         row = incoming_stock_tree.item(selected)["values"]
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE PURCHASE_ORDER SET PURCHASE_ORDER_STATUS = ? WHERE PURCHASE_ORDER_ID = ?",
-            (new_status, row[0]),
-        )
-        if new_status == "Received":
+
+        try:
             cursor.execute(
-                "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY + ? WHERE PRODUCT_NAME = ?",
-                (row[2], row[1]),
+                "UPDATE PURCHASE_ORDER SET PURCHASE_ORDER_STATUS = ? WHERE PURCHASE_ORDER_ID = ?",
+                (new_status, row[0]),
             )
-        conn.commit()
-        conn.close()
-        messagebox.showinfo("Success", "Record successfully edited")
+
+            if new_status == "Received":
+                cursor.execute(
+                    "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY + ? WHERE PRODUCT_NAME = ?",
+                    (row[2], row[1]),
+                )
+
+                # Retrieve the user's full name
+                cursor.execute(
+                    "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+                )
+                fullname = cursor.fetchone()
+
+                # Log the product movement only when the status is "Received"
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "{} received product: {} (ID: {}) with quantity: {}".format(fullname[0], row[1], row[0],
+                                                                                    row[2]),
+                        username,
+                    ),
+                )
+
+            conn.commit()
+            messagebox.showinfo("Success", "Record successfully edited")
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+        finally:
+            conn.close()
+
         add_to_incoming_stock_table()
         add_to_product_table()
         update_to_be_packed_label()
@@ -3408,6 +3618,8 @@ def supervisor_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
+        low_stock_vs_total_item_pie_chart(canvas)
+        bar_chart(canvas1)
 
     def fetch_sale_order_stock_data():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -3522,42 +3734,67 @@ def supervisor_dashboard(username):
             sale_order_product = product_selection_entry.get()
             sale_order_product_quantity = sales_quantity_entry.get()
 
-            sale_order_status = fetch_sale_order_status(sale_order_id)
-            if sale_order_status != "To be Packed":
-                messagebox.showerror("Error", "Sale order status is not 'To be Packed'. Cannot add more products.")
-                return
-
             if not sale_order_product_quantity:
                 messagebox.showerror("Error", "Please enter all fields")
                 return
-            else:
-                conn = sqlite3.connect("Inventory Management System.db")
-                cursor = conn.cursor()
+
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT PRODUCT_QUANTITY FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,),
+            )
+            product_quantity = cursor.fetchone()[0]
+
+            if product_quantity < int(sale_order_product_quantity):
+                messagebox.showerror("Error", "Insufficient quantity")
+                return
+
+            try:
                 cursor.execute(
-                    "SELECT PRODUCT_QUANTITY FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,),
-                )
-                product_quantity = cursor.fetchone()[0]
-                if product_quantity < int(sale_order_product_quantity):
-                    messagebox.showerror("Error", "Insufficient quantity")
-                    return
-                else:
-                    conn = sqlite3.connect("Inventory Management System.db")
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID,SALE_ORDER_PRODUCT,SALE_ORDER_PRODUCT_QUANTITY) \
+                    "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID, SALE_ORDER_PRODUCT, SALE_ORDER_PRODUCT_QUANTITY) \
                     VALUES (?,?,?)",
-                        (sale_order_id, sale_order_product, sale_order_product_quantity),
-                    )
-                    cursor.execute(
-                        "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY - ? WHERE PRODUCT_NAME = ?",
-                        (sale_order_product_quantity, sale_order_product),
-                    )
-                    conn.commit()
-                    conn.close()
-                    messagebox.showinfo("Success", "Data has been inserted")
+                    (sale_order_id, sale_order_product, sale_order_product_quantity),
+                )
+                cursor.execute(
+                    "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY - ? WHERE PRODUCT_NAME = ?",
+                    (sale_order_product_quantity, sale_order_product),
+                )
+
+                # Retrieve the user's full name
+                cursor.execute(
+                    "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+                )
+                fullname = cursor.fetchone()
+
+                # Log the product movement
+                cursor.execute(
+                    "SELECT PRODUCT_ID FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,)
+                )
+                product_id = cursor.fetchone()[0]
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "{} added product: {} (ID: {}) with quantity: {} into sale order (ID: {})".format(fullname[0], sale_order_product,
+                                                                                product_id, sale_order_product_quantity, sale_order_id),
+                        username,
+                    ),
+                )
+
+                conn.commit()
+                messagebox.showinfo("Success", "Data has been inserted")
+
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+            finally:
+                conn.close()
+
             add_to_sale_order_product_table()
             add_to_product_table()
             update_low_stock_item_label()
+            add_to_outgoing_product_table()
             return
 
         select_product_label = customtkinter.CTkLabel(
@@ -3671,6 +3908,24 @@ def supervisor_dashboard(username):
 
         add_to_sale_order_product_table()
         sale_order_window.mainloop()
+
+    def fetch_outgoing_product_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT SALE_ORDER_PRODUCT, SUM(SALE_ORDER_PRODUCT_QUANTITY) FROM SALE_ORDER_PRODUCT \
+              GROUP BY SALE_ORDER_PRODUCT"
+        )
+        sale_order = cursor.fetchall()
+        conn.commit()
+        conn.close()
+        return sale_order
+
+    def add_to_outgoing_product_table():
+        outgoing_stocks = fetch_outgoing_product_data()
+        outgoing_product_tree.delete(*outgoing_product_tree.get_children())
+        for outgoing_stock in outgoing_stocks:
+            outgoing_product_tree.insert("", END, values=outgoing_stock)
 
     def low_stock_vs_total_item_pie_chart(canvas):
         data = []
@@ -3822,6 +4077,24 @@ def supervisor_dashboard(username):
             return f"{prefix}-001"
         else:
             number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
+    def fetch_product_movement_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(PRODUCT_MOVEMENT_ID) FROM PRODUCT_MOVEMENT")
+        last_product_movement_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_product_movement_id
+
+    def generate_product_movement_id(prefix="PM"):
+        product_movement_id = fetch_product_movement_last_id()
+        if product_movement_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(product_movement_id.split("-")[-1])
             new_number = int(number_part) + 1
             return f"{prefix}-{new_number:03d}"
 
@@ -4403,7 +4676,7 @@ def supervisor_dashboard(username):
     product_table_frame = customtkinter.CTkFrame(master=tab_3, width=1280, height=515)
     product_table_frame.place(x=0, y=205)
 
-    product_tree = ttk.Treeview(master=product_table_frame, height=20)
+    product_tree = ttk.Treeview(master=product_table_frame, height=18)
 
     product_verscrlbar = customtkinter.CTkScrollbar(
         master=product_table_frame, orientation="vertical", command=product_tree.yview
@@ -4612,24 +4885,30 @@ def supervisor_dashboard(username):
     task_tree.configure(yscrollcommand=task_verscrlbar.set)
     task_tree["columns"] = (
         "TASKID",
+        "ASSIGNDATE",
         "TASKDESCRIPTION",
         "ASSIGNEDTO",
         "STATUS",
         "DUEDATE",
+        "FINISHDATE"
     )
 
     task_tree.column("#0", width=0, stretch=tk.NO)
-    task_tree.column("TASKID", anchor=tk.CENTER, width=250)
-    task_tree.column("TASKDESCRIPTION", anchor=tk.CENTER, width=250)
-    task_tree.column("ASSIGNEDTO", anchor=tk.CENTER, width=250)
-    task_tree.column("STATUS", anchor=tk.CENTER, width=250)
-    task_tree.column("DUEDATE", anchor=tk.CENTER, width=250)
+    task_tree.column("TASKID", anchor=tk.CENTER, width=100)
+    task_tree.column("ASSIGNDATE", anchor=tk.CENTER, width=130)
+    task_tree.column("TASKDESCRIPTION", anchor=tk.CENTER, width=500)
+    task_tree.column("ASSIGNEDTO", anchor=tk.CENTER, width=160)
+    task_tree.column("STATUS", anchor=tk.CENTER, width=100)
+    task_tree.column("DUEDATE", anchor=tk.CENTER, width=130)
+    task_tree.column("FINISHDATE", anchor=tk.CENTER, width=130)
 
     task_tree.heading("TASKID", text="Task ID")
+    task_tree.heading("ASSIGNDATE", text="Assigned Date")
     task_tree.heading("TASKDESCRIPTION", text="Task")
     task_tree.heading("ASSIGNEDTO", text="Assigned To")
     task_tree.heading("STATUS", text="Status")
     task_tree.heading("DUEDATE", text="Due Date")
+    task_tree.heading("FINISHDATE", text="Completed Date")
 
     task_tree.pack(side="bottom", fill="both")
     task_tree.bind("<ButtonRelease>", display_product_record)
@@ -4755,7 +5034,7 @@ def supervisor_dashboard(username):
         text_color="black",
     )
 
-    task_menu_frame.grid(row=0, column=0)
+    task_menu_frame.grid(row=0, column=1)
     insert_task_data_label.grid(row=0, column=0, sticky=W, padx=10, pady=10)
     task_label.grid(row=1, column=0, padx=5, pady=5)
     task_entry.grid(row=1, column=1, padx=5, pady=5)
@@ -4767,14 +5046,55 @@ def supervisor_dashboard(username):
     edittask_btn.grid(row=4, column=1, padx=5, pady=5)
     deletetask_btn.grid(row=4, column=2, padx=5, pady=5)
 
-    task_menu_frame2.grid(row=0, column=1)
+    task_menu_frame2.grid(row=0, column=2)
     generate_performance_report_label.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
     selected_worker_label.grid(row=1, column=0, padx=5, pady=5)
     selected_worker_entry.grid(row=1, column=1, padx=5, pady=5)
     generatereport_btn.grid(row=2, column=0, padx=5, pady=5, columnspan=2)
 
+    def fetch_task_summary_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT TASK_ASSIGNED_TO, avg(julianday(TASK_FINISH_DATE) - julianday(TASK_ASSIGN_DATE)) FROM TASK group by TASK_ASSIGNED_TO"
+        )
+        task_summary = cursor.fetchall()
+        conn.commit()
+        conn.close()
+        return task_summary
+
+    def add_to_task_summary_table():
+        task_summary = fetch_task_summary_data()
+        task_summary_tree.delete(*task_summary_tree.get_children())
+        for task in task_summary:
+            task_summary_tree.insert("", END, values=task)
+
+    task_summary_table_frame = customtkinter.CTkFrame(master=tab_4)
+    task_summary_table_frame.grid(row=0, column=0)
+
+    task_summary_tree = ttk.Treeview(master=task_summary_table_frame, height=7)
+
+    task_summary_verscrlbar = customtkinter.CTkScrollbar(master=task_summary_table_frame,
+                orientation="vertical", command=task_summary_tree.yview,)
+    task_summary_verscrlbar.pack(side="right", fill="y")
+
+    task_summary_tree.configure(yscrollcommand=task_summary_verscrlbar.set)
+    task_summary_tree["columns"] = ("WORKERID", "AVEFINISHDAYS",)
+
+    task_summary_tree.column("#0", width=0, stretch=tk.NO)
+    task_summary_tree.column("WORKERID", anchor=tk.CENTER, width=200)
+    task_summary_tree.column("AVEFINISHDAYS", anchor=tk.CENTER, width=120)
+
+    task_summary_tree.heading("WORKERID", text="Worker Username")
+    task_summary_tree.heading("AVEFINISHDAYS", text="  Average\nFinish (days)")
+
+    task_summary_tree.pack(side="bottom", fill="both")
+
+    add_to_task_summary_table()
+
     tab_4.columnconfigure(0, weight=2)
     tab_4.columnconfigure(1, weight=2)
+    tab_4.columnconfigure(2, weight=2)
 
     incoming_stock_table_frame = customtkinter.CTkFrame(
         master=tab_5, width=1006, height=515
@@ -4832,7 +5152,7 @@ def supervisor_dashboard(username):
     )
     purchase_order_status_entry = customtkinter.CTkComboBox(
         master=incoming_stock_menu_frame,
-        values=["To be Received", "Received"],
+        values=["Received"],
         width=230,
         height=30,
         font=customtkinter.CTkFont("SF Pro Display"),
@@ -4884,10 +5204,10 @@ def supervisor_dashboard(username):
     )
 
     outgoing_stock_tree.column("#0", width=0, stretch=tk.NO)
-    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=313)
-    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=313)
-    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=313)
-    outgoing_stock_tree.column("OUTGOINGSTOCKSTATUS", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=103)
+    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=103)
+    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=303)
+    outgoing_stock_tree.column("OUTGOINGSTOCKSTATUS", anchor=tk.CENTER, width=203)
 
     outgoing_stock_tree.heading("OUTGOINGSTOCKID", text="ID")
     outgoing_stock_tree.heading("OUTGOINGSTOCKNAME", text="Date Created")
@@ -4938,6 +5258,36 @@ def supervisor_dashboard(username):
     search_outgoing_stock_entry = customtkinter.CTkEntry(tab_6, placeholder_text="Search", width=1050,)
     search_outgoing_stock_entry.grid(row=1, column=0, padx=10, pady=10)
     search_outgoing_stock_entry.bind("<KeyRelease>", search_outgoing_stock)
+
+    outgoing_product_table_frame = customtkinter.CTkFrame(master=tab_6, width=506, height=515)
+    outgoing_product_table_frame.place(x=740, y=205)
+
+    outgoing_product_tree = ttk.Treeview(master=outgoing_product_table_frame, height=20)
+
+    outgoing_product_verscrlbar = customtkinter.CTkScrollbar(
+        master=outgoing_product_table_frame,
+        orientation="vertical",
+        command=outgoing_product_tree.yview,
+    )
+
+    outgoing_product_verscrlbar.pack(side="right", fill="y")
+
+    outgoing_product_tree.configure(yscrollcommand=outgoing_product_verscrlbar.set)
+    outgoing_product_tree["columns"] = (
+        "OUTGOING_PRODUCTNAME",
+        "OUTGOING_QUANTITY",
+    )
+
+    outgoing_product_tree.column("#0", width=0, stretch=tk.NO)
+    outgoing_product_tree.column("OUTGOING_PRODUCTNAME", anchor=tk.CENTER, width=390)
+    outgoing_product_tree.column("OUTGOING_QUANTITY", anchor=tk.CENTER, width=120)
+
+    outgoing_product_tree.heading("OUTGOING_PRODUCTNAME", text="Product Name")
+    outgoing_product_tree.heading("OUTGOING_QUANTITY", text="         Total\nOutgoing Quantity")
+
+    outgoing_product_tree.pack(side="bottom", fill="both")
+
+    add_to_outgoing_product_table()
 
     tab_6.columnconfigure(0, weight=2)
 
@@ -5857,6 +6207,19 @@ def worker_dashboard(username):
                 )
                 conn.commit()
 
+                # Log the product movement
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "Added product: {} with ID: {} by {} to warehouse".format(product_name, product_id, fullname[0]),
+                        username,
+                    ),
+                )
+                conn.commit()
+
             except Exception as e:
                 messagebox.showerror("Error", str(e))
             finally:
@@ -6076,19 +6439,47 @@ def worker_dashboard(username):
 
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO PURCHASE_ORDER (PURCHASE_ORDER_ID,PURCHASE_ORDER_PRODUCT,PURCHASE_ORDER_PRODUCT_QUANTITY,PURCHASE_ORDER_STATUS) \
-            VALUES (?,?,?,?)",
-                (
-                    incoming_stock_id,
-                    incoming_stock_product,
-                    incoming_stock_quantity,
-                    incoming_stock_status,
-                ),
-            )
-            conn.commit()
-            conn.close()
-            messagebox.showinfo("Success", "Data has been inserted")
+
+            try:
+                cursor.execute(
+                    "INSERT INTO PURCHASE_ORDER (PURCHASE_ORDER_ID, PURCHASE_ORDER_PRODUCT, PURCHASE_ORDER_PRODUCT_QUANTITY, PURCHASE_ORDER_STATUS) \
+                    VALUES (?,?,?,?)",
+                    (
+                        incoming_stock_id,
+                        incoming_stock_product,
+                        incoming_stock_quantity,
+                        incoming_stock_status,
+                    ),
+                )
+                conn.commit()
+                messagebox.showinfo("Success", "Data has been inserted")
+
+                # Retrieve the user's full name
+                cursor.execute(
+                    "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+                )
+                fullname = cursor.fetchone()
+
+                # Log the product movement
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "{} added incoming stock for product: {} with quantity: {}".format(fullname[0],
+                                                                                           incoming_stock_product,
+                                                                                           incoming_stock_quantity),
+                        username,
+                    ),
+                )
+                conn.commit()
+
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+            finally:
+                conn.close()
+
             add_to_incoming_stock_table()
             fetch_tbr_quantity()
             update_total_quantity_in_hand_label()
@@ -6275,7 +6666,7 @@ def worker_dashboard(username):
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT TASK_DESCRIPTION,TASK_STATUS,TASK_DUE_DATE FROM TASK WHERE TASK_ASSIGNED_TO = ?",
+            "SELECT TASK_ID, TASK_ASSIGN_DATE, TASK_DESCRIPTION,TASK_STATUS,TASK_DUE_DATE, TASK_FINISH_DATE FROM TASK WHERE TASK_ASSIGNED_TO = ?",
             (username,),
         )
         task = cursor.fetchall()
@@ -6296,30 +6687,36 @@ def worker_dashboard(username):
         task_tree.tag_configure("Due, Completed", background="#FF7F7F", foreground="black")
 
 
+    def days_between(d1, d2):
+        d1 = datetime.strptime(d1, "%Y-%m-%d")
+        d2 = datetime.strptime(d2, "%Y-%m-%d")
+        return (d2 - d1).days
+
     def check_task_due_date():
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT TASK_DUE_DATE, TASK_DESCRIPTION FROM TASK WHERE TASK_ASSIGNED_TO = ? AND TASK_STATUS = ?",
+            "SELECT TASK_DUE_DATE, TASK_ID FROM TASK WHERE TASK_ASSIGNED_TO = ? AND TASK_STATUS = ?",
             (username, "Pending"),
         )
         tasks = cursor.fetchall()
         conn.commit()
         conn.close()
 
-        today = datetime.today()
+        today = str(datetime.today().date())
 
         due_task = 0
-
         for task in tasks:
             due_date_str = task[0]
-            due_date = datetime.strptime(due_date_str, "%m/%d/%y")
-            if due_date < today:
+            due_days = days_between(today, due_date_str)
+            #due_date = datetime.strptime(due_date_str, "%m/%d/%y")
+            #due_date = datetime.strptime(due_date_str, "%y/%m/%d")
+            if due_days < 0:
                 due_task += 1
                 conn = sqlite3.connect("Inventory Management System.db")
                 cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE TASK SET TASK_STATUS = ? WHERE TASK_DESCRIPTION = ?",
+                    "UPDATE TASK SET TASK_STATUS = ? WHERE TASK_ID = ?",
                     ("Due, Not Completed", task[1]),
                 )
                 conn.commit()
@@ -6335,37 +6732,44 @@ def worker_dashboard(username):
             messagebox.showerror("Error", "Please select a record to edit")
             return
         row = task_tree.item(selected_task)["values"]
+        task_finish_date = str(datetime.today().date())
 
-        if row[1] == "Completed":
+        if row[3] == "Completed":
             messagebox.showerror("Error", "Task already completed")
             return
 
-        if row[1] == "Pending":
+        if row[3] == "Pending":
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE TASK SET TASK_STATUS = ? WHERE TASK_DESCRIPTION = ?",
-                ("Completed", row[0]),
+                "UPDATE TASK SET TASK_STATUS = ?, TASK_FINISH_DATE = ? WHERE TASK_ID = ?",
+                ("Completed", task_finish_date, row[0]),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Success", "Record successfully edited")
             check_task_status()
             add_to_task_table()
+            update_completed_task_label()
+            update_pending_task_label()
+            update_overdue_task_label()
             return
 
-        if row[1] == "Due, Not Completed":
+        if row[3] == "Due, Not Completed":
             conn = sqlite3.connect("Inventory Management System.db")
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE TASK SET TASK_STATUS = ? WHERE TASK_DESCRIPTION = ?",
-                ("Due, Completed", row[0]),
+                "UPDATE TASK SET TASK_STATUS = ?, TASK_FINISH_DATE = ? WHERE TASK_ID = ?",
+                ("Due, Completed", task_finish_date, row[0]),
             )
             conn.commit()
             conn.close()
             messagebox.showinfo("Success", "Record successfully edited")
             check_task_status()
             add_to_task_table()
+            update_completed_task_label()
+            update_pending_task_label()
+            update_overdue_task_label()
             return
 
     def fetch_incoming_stock_data():
@@ -6399,21 +6803,50 @@ def worker_dashboard(username):
         if not selected:
             messagebox.showerror("Error", "Please select a record to edit")
             return
+
         row = incoming_stock_tree.item(selected)["values"]
         conn = sqlite3.connect("Inventory Management System.db")
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE PURCHASE_ORDER SET PURCHASE_ORDER_STATUS = ? WHERE PURCHASE_ORDER_ID = ?",
-            (new_status, row[0]),
-        )
-        if new_status == "Received":
+
+        try:
             cursor.execute(
-                "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY + ? WHERE PRODUCT_NAME = ?",
-                (row[2], row[1]),
+                "UPDATE PURCHASE_ORDER SET PURCHASE_ORDER_STATUS = ? WHERE PURCHASE_ORDER_ID = ?",
+                (new_status, row[0]),
             )
-        conn.commit()
-        conn.close()
-        messagebox.showinfo("Success", "Record successfully edited")
+
+            if new_status == "Received":
+                cursor.execute(
+                    "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY + ? WHERE PRODUCT_NAME = ?",
+                    (row[2], row[1]),
+                )
+
+                # Retrieve the user's full name
+                cursor.execute(
+                    "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+                )
+                fullname = cursor.fetchone()
+
+                # Log the product movement only when the status is "Received"
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "{} received product: {} (ID: {}) with quantity: {}".format(fullname[0], row[1], row[0],
+                                                                                    row[2]),
+                        username,
+                    ),
+                )
+
+            conn.commit()
+            messagebox.showinfo("Success", "Record successfully edited")
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+        finally:
+            conn.close()
+
         add_to_incoming_stock_table()
         add_to_product_table()
         update_to_be_packed_label()
@@ -6423,6 +6856,8 @@ def worker_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
+        low_stock_vs_total_item_pie_chart(canvas)
+        bar_chart(canvas1)
 
     def check_pending_task():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -6447,6 +6882,53 @@ def worker_dashboard(username):
             toast.set_audio(audio.Default, loop=False)
             toast.show()
         return list_of_task_status
+
+    def fetch_completed_task_data():
+        completed_task = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(TASK_STATUS) FROM TASK WHERE TASK_STATUS = ?", ("Completed",))
+        completed_task_data = cursor.fetchone()[0]
+        completed_task += completed_task_data
+        conn.commit()
+        conn.close()
+        return completed_task
+
+    def update_completed_task_label():
+        new_count = fetch_completed_task_data()
+        completed_tasks_label_1.configure(text=str(new_count))
+
+    def fetch_pending_task_data():
+        pending_task = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(TASK_STATUS) FROM TASK WHERE TASK_STATUS = ?", ("Pending",))
+        pending_task_data = cursor.fetchone()[0]
+        pending_task += pending_task_data
+        conn.commit()
+        conn.close()
+        return pending_task
+
+    def update_pending_task_label():
+        new_count = fetch_pending_task_data()
+        pending_tasks_label_1.configure(text=str(new_count))
+
+    def fetch_overdue_task_data():
+        overdue_task = 0
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(TASK_STATUS) FROM TASK WHERE TASK_STATUS = ?", ("Due, Not Completed",))
+        overdue_task_data1 = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(TASK_STATUS) FROM TASK WHERE TASK_STATUS = ?", ("Due, Completed",))
+        overdue_task_data2 = cursor.fetchone()[0]
+        overdue_task += overdue_task_data2 + overdue_task_data1
+        conn.commit()
+        conn.close()
+        return overdue_task
+
+    def update_overdue_task_label():
+        new_count = fetch_overdue_task_data()
+        overdue_tasks_label_1.configure(text=str(new_count))
 
     def fetch_purchase_order_last_id():
         conn = sqlite3.connect("Inventory Management System.db")
@@ -6574,34 +7056,64 @@ def worker_dashboard(username):
             if not sale_order_product_quantity:
                 messagebox.showerror("Error", "Please enter all fields")
                 return
-            else:
-                conn = sqlite3.connect("Inventory Management System.db")
-                cursor = conn.cursor()
+
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT PRODUCT_QUANTITY FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,),
+            )
+            product_quantity = cursor.fetchone()[0]
+
+            if product_quantity < int(sale_order_product_quantity):
+                messagebox.showerror("Error", "Insufficient quantity")
+                return
+
+            try:
                 cursor.execute(
-                    "SELECT PRODUCT_QUANTITY FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,),
-                )
-                product_quantity = cursor.fetchone()[0]
-                if product_quantity < int(sale_order_product_quantity):
-                    messagebox.showerror("Error", "Insufficient quantity")
-                    return
-                else:
-                    conn = sqlite3.connect("Inventory Management System.db")
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID,SALE_ORDER_PRODUCT,SALE_ORDER_PRODUCT_QUANTITY) \
+                    "INSERT INTO SALE_ORDER_PRODUCT (SALE_ORDER_ID, SALE_ORDER_PRODUCT, SALE_ORDER_PRODUCT_QUANTITY) \
                     VALUES (?,?,?)",
-                        (sale_order_id, sale_order_product, sale_order_product_quantity),
-                    )
-                    cursor.execute(
-                        "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY - ? WHERE PRODUCT_NAME = ?",
-                        (sale_order_product_quantity, sale_order_product),
-                    )
-                    conn.commit()
-                    conn.close()
-                    messagebox.showinfo("Success", "Data has been inserted")
+                    (sale_order_id, sale_order_product, sale_order_product_quantity),
+                )
+                cursor.execute(
+                    "UPDATE PRODUCT SET PRODUCT_QUANTITY = PRODUCT_QUANTITY - ? WHERE PRODUCT_NAME = ?",
+                    (sale_order_product_quantity, sale_order_product),
+                )
+
+                # Retrieve the user's full name
+                cursor.execute(
+                    "SELECT USER_FULLNAME FROM USER WHERE USERNAME = ?", (username,)
+                )
+                fullname = cursor.fetchone()
+
+                # Log the product movement
+                cursor.execute(
+                    "SELECT PRODUCT_ID FROM PRODUCT WHERE PRODUCT_NAME = ?", (sale_order_product,)
+                )
+                product_id = cursor.fetchone()[0]
+                cursor.execute(
+                    "INSERT INTO PRODUCT_MOVEMENT (PRODUCT_MOVEMENT_ID, PRODUCT_MOVEMENT_DATE, PRODUCT_MOVEMENT, USER) \
+                    VALUES (?,?,?,?)",
+                    (
+                        generate_product_movement_id(),
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "{} added product: {} (ID: {}) with quantity: {} into sale order (ID: {})".format(fullname[0], sale_order_product,
+                                                                                product_id, sale_order_product_quantity, sale_order_id),
+                        username,
+                    ),
+                )
+
+                conn.commit()
+                messagebox.showinfo("Success", "Data has been inserted")
+
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+            finally:
+                conn.close()
+
             add_to_sale_order_product_table()
             add_to_product_table()
             update_low_stock_item_label()
+            add_to_outgoing_product_table()
             return
 
         select_product_label = customtkinter.CTkLabel(
@@ -6716,6 +7228,24 @@ def worker_dashboard(username):
         add_to_sale_order_product_table()
         sale_order_window.mainloop()
 
+    def fetch_outgoing_product_data():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT SALE_ORDER_PRODUCT, SUM(SALE_ORDER_PRODUCT_QUANTITY) FROM SALE_ORDER_PRODUCT \
+              GROUP BY SALE_ORDER_PRODUCT"
+        )
+        sale_order = cursor.fetchall()
+        conn.commit()
+        conn.close()
+        return sale_order
+
+    def add_to_outgoing_product_table():
+        outgoing_stocks = fetch_outgoing_product_data()
+        outgoing_product_tree.delete(*outgoing_product_tree.get_children())
+        for outgoing_stock in outgoing_stocks:
+            outgoing_product_tree.insert("", END, values=outgoing_stock)
+
     def low_stock_vs_total_item_pie_chart(canvas):
         data = []
 
@@ -6795,6 +7325,24 @@ def worker_dashboard(username):
             return f"{prefix}-001"
         else:
             number_part = str(last_customer_id.split("-")[-1])
+            new_number = int(number_part) + 1
+            return f"{prefix}-{new_number:03d}"
+
+    def fetch_product_movement_last_id():
+        conn = sqlite3.connect("Inventory Management System.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(PRODUCT_MOVEMENT_ID) FROM PRODUCT_MOVEMENT")
+        last_product_movement_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return last_product_movement_id
+
+    def generate_product_movement_id(prefix="PM"):
+        product_movement_id = fetch_product_movement_last_id()
+        if product_movement_id is None:
+            return f"{prefix}-001"
+        else:
+            number_part = str(product_movement_id.split("-")[-1])
             new_number = int(number_part) + 1
             return f"{prefix}-{new_number:03d}"
 
@@ -7585,19 +8133,96 @@ def worker_dashboard(username):
     task_verscrlbar.pack(side="right", fill="y")
 
     task_tree.configure(yscrollcommand=task_verscrlbar.set)
-    task_tree["columns"] = ("TASKDESCRIPTION", "TASKSTATUS", "DUEDATE")
+    task_tree["columns"] = ("TASKID","TASKASSIGNDATE", "TASKDESCRIPTION", "TASKSTATUS", "DUEDATE", "FINISHDATE")
 
     task_tree.column("#0", width=0, stretch=tk.NO)
-    task_tree.column("TASKDESCRIPTION", anchor=tk.CENTER, width=418)
-    task_tree.column("TASKSTATUS", anchor=tk.CENTER, width=418)
-    task_tree.column("DUEDATE", anchor=tk.CENTER, width=418)
+    task_tree.column("TASKID", anchor=tk.CENTER, width=100)
+    task_tree.column("TASKASSIGNDATE", anchor=tk.CENTER, width=150)
+    task_tree.column("TASKDESCRIPTION", anchor=tk.CENTER, width=400)
+    task_tree.column("TASKSTATUS", anchor=tk.CENTER, width=300)
+    task_tree.column("DUEDATE", anchor=tk.CENTER, width=150)
+    task_tree.column("FINISHDATE", anchor=tk.CENTER, width=150)
 
-    task_tree.heading("TASKDESCRIPTION", text="Task")
+    task_tree.heading("TASKID", text="Task ID")
+    task_tree.heading("TASKASSIGNDATE", text="Task Assigned Date")
+    task_tree.heading("TASKDESCRIPTION", text="Task Description")
     task_tree.heading("TASKSTATUS", text="Status")
     task_tree.heading("DUEDATE", text="Due Date")
+    task_tree.heading("FINISHDATE", text="Task Finish Date")
 
     task_tree.pack(side="bottom", fill="both")
     task_tree.bind("<ButtonRelease>", display_product_record)
+
+    task_summary_frame = customtkinter.CTkFrame(
+        tab_4, corner_radius=10, border_width=2
+    )
+
+    task_summary_title = customtkinter.CTkLabel(
+        task_summary_frame,
+        text="Task Summary",
+        font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=15),
+    )
+
+    completed_tasks_label_1 = customtkinter.CTkLabel(
+        master=task_summary_frame,
+        text=str(fetch_completed_task_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    completed_tasks_label_2 = customtkinter.CTkLabel(
+        master=task_summary_frame,
+        text="Completed Task",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    task_summary_vertical_separator_1 = customtkinter.CTkFrame(
+        task_summary_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    pending_tasks_label_1 = customtkinter.CTkLabel(
+        master=task_summary_frame,
+        text=str(fetch_pending_task_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    pending_tasks_label_2 = customtkinter.CTkLabel(
+        master=task_summary_frame,
+        text="Pending Task",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    task_summary_vertical_separator_2 = customtkinter.CTkFrame(
+        task_summary_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    overdue_tasks_label_1 = customtkinter.CTkLabel(
+        master=task_summary_frame,
+        text=str(fetch_overdue_task_data()),
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    overdue_tasks_label_2 = customtkinter.CTkLabel(
+        master=task_summary_frame,
+        text="Overdue Task",
+        font=customtkinter.CTkFont("SF Pro Display", size=13),
+    )
+
+    task_summary_vertical_separator_3 = customtkinter.CTkFrame(
+        task_summary_frame, width=2, height=50, fg_color="#CCCCCC"
+    )
+
+    task_summary_frame.grid(row=0, column=0, padx=10, pady=10)
+
+    task_summary_title.grid(row=0, column=0, sticky=W, padx=10, pady=10, columnspan=2)
+    completed_tasks_label_1.grid(row=1, column=0, padx=20, pady=5)
+    completed_tasks_label_2.grid(row=2, column=0, padx=20, pady=5)
+    task_summary_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+    pending_tasks_label_1.grid(row=1, column=2, padx=20, pady=5)
+    pending_tasks_label_2.grid(row=2, column=2, padx=20, pady=5)
+    task_summary_vertical_separator_2.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+    overdue_tasks_label_1.grid(row=1, column=4, padx=20, pady=5)
+    overdue_tasks_label_2.grid(row=2, column=4, padx=20, pady=5)
+    # task_summary_vertical_separator_3.grid(row=1, column=5, rowspan=2, padx=5, pady=5)
 
     completetask_btn = customtkinter.CTkButton(
         master=tab_4,
@@ -7610,7 +8235,10 @@ def worker_dashboard(username):
         width=150,
         height=50,
     )
-    completetask_btn.pack(anchor="center", pady=20)
+
+    completetask_btn.grid(row=1, column=0, padx=5, pady=5)
+
+    tab_4.columnconfigure(0, weight=2)
 
     incoming_stock_table_frame = customtkinter.CTkFrame(
         master=tab_5, width=1006, height=515
@@ -7720,10 +8348,10 @@ def worker_dashboard(username):
     )
 
     outgoing_stock_tree.column("#0", width=0, stretch=tk.NO)
-    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=313)
-    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=313)
-    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=313)
-    outgoing_stock_tree.column("OUTGOINGSTOCKSTATUS", anchor=tk.CENTER, width=313)
+    outgoing_stock_tree.column("OUTGOINGSTOCKID", anchor=tk.CENTER, width=103)
+    outgoing_stock_tree.column("OUTGOINGSTOCKNAME", anchor=tk.CENTER, width=103)
+    outgoing_stock_tree.column("OUTGOINGSTOCKQUANTITY", anchor=tk.CENTER, width=303)
+    outgoing_stock_tree.column("OUTGOINGSTOCKSTATUS", anchor=tk.CENTER, width=203)
 
     outgoing_stock_tree.heading("OUTGOINGSTOCKID", text="ID")
     outgoing_stock_tree.heading("OUTGOINGSTOCKNAME", text="Date Created")
@@ -7775,6 +8403,37 @@ def worker_dashboard(username):
     search_outgoing_stock_entry.grid(row=1, column=0, padx=10, pady=10)
     search_outgoing_stock_entry.bind("<KeyRelease>", search_outgoing_stock)
 
+
+    outgoing_product_table_frame = customtkinter.CTkFrame(master=tab_6, width=506, height=515)
+    outgoing_product_table_frame.place(x=740, y=205)
+
+    outgoing_product_tree = ttk.Treeview(master=outgoing_product_table_frame, height=20)
+
+    outgoing_product_verscrlbar = customtkinter.CTkScrollbar(
+        master=outgoing_product_table_frame,
+        orientation="vertical",
+        command=outgoing_product_tree.yview,
+    )
+
+    outgoing_product_verscrlbar.pack(side="right", fill="y")
+
+    outgoing_product_tree.configure(yscrollcommand=outgoing_product_verscrlbar.set)
+    outgoing_product_tree["columns"] = (
+        "OUTGOING_PRODUCTNAME",
+        "OUTGOING_QUANTITY",
+    )
+
+    outgoing_product_tree.column("#0", width=0, stretch=tk.NO)
+    outgoing_product_tree.column("OUTGOING_PRODUCTNAME", anchor=tk.CENTER, width=390)
+    outgoing_product_tree.column("OUTGOING_QUANTITY", anchor=tk.CENTER, width=120)
+
+    outgoing_product_tree.heading("OUTGOING_PRODUCTNAME", text="Product Name")
+    outgoing_product_tree.heading("OUTGOING_QUANTITY", text="         Total\nOutgoing Quantity")
+
+    outgoing_product_tree.pack(side="bottom", fill="both")
+
+    add_to_outgoing_product_table()
+
     tab_6.columnconfigure(0, weight=2)
 
     add_to_customer_table()
@@ -7790,6 +8449,6 @@ def worker_dashboard(username):
 
 #login_page()
 #admin_dashboard("admin")
-supervisor_dashboard("supervisor")
-#worker_dashboard("worker1")
+#supervisor_dashboard("supervisor")
+worker_dashboard("worker1")
 app.mainloop()
