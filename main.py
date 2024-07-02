@@ -3264,7 +3264,6 @@ def supervisor_dashboard(username):
             product_selection_name_label2.configure(text=choice[0][0])
             product_selection_description_label2.configure(text=choice[0][1])
 
-
         def add_sale_order_product():
             sale_order_id = values[0]
             sale_order_product_id = product_selection_entry.get()
@@ -3272,6 +3271,14 @@ def supervisor_dashboard(username):
 
             if not sale_order_product_quantity:
                 messagebox.showerror("Error", "Please enter all fields")
+                return
+
+            try:
+                sale_order_product_quantity = int(sale_order_product_quantity)
+                if sale_order_product_quantity < 0:
+                    raise ValueError("Quantity cannot be negative")
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid non-negative integer for quantity")
                 return
 
             conn = sqlite3.connect("Inventory Management System.db")
@@ -3299,7 +3306,7 @@ def supervisor_dashboard(username):
             )
             product_quantity = cursor.fetchone()[0]
 
-            if product_quantity < int(sale_order_product_quantity):
+            if product_quantity < sale_order_product_quantity:
                 messagebox.showerror("Error", "Insufficient quantity")
                 conn.close()
                 return
@@ -5638,7 +5645,6 @@ def worker_dashboard(username):
             product_selection_name_label2.configure(text=choice[0][0])
             product_selection_description_label2.configure(text=choice[0][1])
 
-
         def add_sale_order_product():
             sale_order_id = values[0]
             sale_order_product_id = product_selection_entry.get()
@@ -5646,6 +5652,14 @@ def worker_dashboard(username):
 
             if not sale_order_product_quantity:
                 messagebox.showerror("Error", "Please enter all fields")
+                return
+
+            try:
+                sale_order_product_quantity = int(sale_order_product_quantity)
+                if sale_order_product_quantity < 0:
+                    raise ValueError("Quantity cannot be negative")
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid non-negative integer for quantity")
                 return
 
             conn = sqlite3.connect("Inventory Management System.db")
@@ -5673,7 +5687,7 @@ def worker_dashboard(username):
             )
             product_quantity = cursor.fetchone()[0]
 
-            if product_quantity < int(sale_order_product_quantity):
+            if product_quantity < sale_order_product_quantity:
                 messagebox.showerror("Error", "Insufficient quantity")
                 conn.close()
                 return
