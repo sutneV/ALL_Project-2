@@ -2378,7 +2378,7 @@ def supervisor_dashboard(username):
             return
 
         sales_window = customtkinter.CTk()
-        sales_window.title("Product Details")
+        sales_window.title("Customer Details")
         sales_window.resizable(False, False)
 
         customer_details_frame = customtkinter.CTkFrame(sales_window, border_width=2, corner_radius=10)
@@ -4749,7 +4749,7 @@ def worker_dashboard(username):
             return
 
         sales_window = customtkinter.CTk()
-        sales_window.title("Product Details")
+        sales_window.title("Customer Details")
         sales_window.resizable(False, False)
 
         customer_details_frame = customtkinter.CTkFrame(sales_window, border_width=2, corner_radius=10)
