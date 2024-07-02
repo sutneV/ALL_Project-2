@@ -4687,6 +4687,42 @@ def worker_dashboard(username):
         selected_item = customer_tree.selection()[0]
         values = customer_tree.item(selected_item, "values")
 
+        def fetch_to_be_packed_data_customer():
+            total_to_be_packed = 0
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ? AND SALE_ORDER_CUSTOMER = ?",
+                           ("To be Packed", values[1],))
+            to_be_packed_data = cursor.fetchone()[0]
+            total_to_be_packed += to_be_packed_data
+            conn.commit()
+            conn.close()
+            return total_to_be_packed
+
+        def fetch_to_be_shipped_data_customer():
+            total_to_be_shipped = 0
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ? AND SALE_ORDER_CUSTOMER = ?",
+                           ("To be Shipped", values[1],))
+            to_be_shipped_data = cursor.fetchone()[0]
+            total_to_be_shipped += to_be_shipped_data
+            conn.commit()
+            conn.close()
+            return total_to_be_shipped
+
+        def fetch_to_be_delivered_data_customer():
+            total_to_be_delivered = 0
+            conn = sqlite3.connect("Inventory Management System.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(SALE_ORDER_STATUS) FROM SALE_ORDER WHERE SALE_ORDER_STATUS = ? AND SALE_ORDER_CUSTOMER = ?",
+                           ("To be Delivered", values[1],))
+            to_be_delivered_data = cursor.fetchone()[0]
+            total_to_be_delivered += to_be_delivered_data
+            conn.commit()
+            conn.close()
+            return total_to_be_delivered
+
         def add_new_sale_order():
             sale_order_id = generate_sale_order_id("SO")
             sale_order_date = date.today().strftime("%m/%d/%Y")
@@ -4716,24 +4752,34 @@ def worker_dashboard(username):
         sales_window.title("Product Details")
         sales_window.resizable(False, False)
 
-        customer_id_label = Inv_Label(sales_window, 0, 0, (10, 5), "Customer ID:")
-        customer_id_label_details = Inv_Label(sales_window, 0, 1, 5, f"{values[0]}")
-        customer_name_label = Inv_Label(sales_window, 1, 0, (10, 5), "Customer Name:")
-        customer_name_label_details = Inv_Label(sales_window, 1, 1, 5, f"{values[1]}")
-        customer_email_label = Inv_Label(sales_window, 2, 0, (10, 5), "Customer Email:")
-        customer_email_label_details = Inv_Label(sales_window, 2, 1, 5, f"{values[2]}")
-        customer_contact_label = Inv_Label(sales_window, 3, 0, (10, 5), "Customer Contact No.:")
-        customer_contact_label_details = Inv_Label(sales_window, 3, 1, 5, f"{values[3]}")
+        customer_details_frame = customtkinter.CTkFrame(sales_window, border_width=2, corner_radius=10)
+        customer_details_frame.grid(row=0, column=0, padx=10, pady=10)
 
-        sales_btn = Inv_Button(sales_window, 6, 0, 0, "#007FFF", "Create Sales Order", add_new_sale_order)
+        customer_order_frame = customtkinter.CTkFrame(sales_window, border_width=2, corner_radius=10)
+        customer_order_frame.grid(row=0, column=1, padx=10, pady=10)
 
-        sales_window.columnconfigure(0, weight=1)
-        sales_window.columnconfigure(1, weight=1)
-        sales_window.columnconfigure(2, weight=1)
-        sales_window.columnconfigure(3, weight=1)
-        sales_window.columnconfigure(4, weight=1)
-        sales_window.columnconfigure(5, weight=1)
-        sales_window.columnconfigure(6, weight=1)
+
+        customer_details_label =  Inv_titlelabel(customer_details_frame, 0, 0, (10, 5), "Customer Details")
+        customer_id_label = Inv_Label(customer_details_frame, 1, 0, (10, 5), "Customer ID:")
+        customer_id_label_details = Inv_Label(customer_details_frame, 1, 1, 5, f"{values[0]}")
+        customer_name_label = Inv_Label(customer_details_frame, 2, 0, (10, 5), "Customer Name:")
+        customer_name_label_details = Inv_Label(customer_details_frame, 2, 1, 5, f"{values[1]}")
+        customer_email_label = Inv_Label(customer_details_frame, 3, 0, (10, 5), "Customer Email:")
+        customer_email_label_details = Inv_Label(customer_details_frame, 3, 1, 5, f"{values[2]}")
+        customer_contact_label = Inv_Label(customer_details_frame, 4, 0, (10, 5), "Customer Contact No.:")
+        customer_contact_label_details = Inv_Label(customer_details_frame, 4, 1, 5, f"{values[3]}")
+
+        sales_activity_title_customer = Inv_titlelabel(customer_order_frame, 0, 0, 10, "Sales Activity")
+        to_be_packed_label_1 = Inv_Label(customer_order_frame, 1, 0, 20, str(fetch_to_be_packed_data_customer()))
+        to_be_packed_label_2 = Inv_Label(customer_order_frame, 2, 0, 20, "To be Packed")
+        sales_activity_vertical_separator_1.grid(row=1, column=1, rowspan=2, padx=5, pady=5)
+        to_be_shipped_label_1 = Inv_Label(customer_order_frame, 1, 2, 20, str(fetch_to_be_shipped_data_customer()))
+        to_be_shipped_label_2 = Inv_Label(customer_order_frame, 2, 2, 20, "To be Shipped")
+        sales_activity_vertical_separator_2.grid(row=1, column=3, rowspan=2, padx=5, pady=5)
+        to_be_delivered_label_1 = Inv_Label(customer_order_frame, 1, 4, 20, str(fetch_to_be_delivered_data_customer()))
+        to_be_delivered_label_2 = Inv_Label(customer_order_frame, 2, 4, 20, "To be Delivered")
+
+        sales_btn = Inv_Button(sales_window, 1, 0, 0, "#007FFF", "Create Sales Order", add_new_sale_order)
 
         sales_window.mainloop()
 
