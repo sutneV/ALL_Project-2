@@ -1169,6 +1169,8 @@ def admin_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
+        low_stock_vs_total_item_pie_chart()
+        bar_chart()
         return
 
     def search_product(event):
@@ -2648,6 +2650,8 @@ def supervisor_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
+        low_stock_vs_total_item_pie_chart()
+        bar_chart()
         return
 
     def search_product(event):
@@ -4940,6 +4944,8 @@ def worker_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
+        low_stock_vs_total_item_pie_chart()
+        bar_chart()
         return
 
     def search_product(event):
