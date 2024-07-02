@@ -1126,6 +1126,12 @@ def admin_dashboard(username):
         product_id = row[0]
         product_name = row[1]
 
+        # Ask for confirmation
+        confirm = messagebox.askyesno("Confirm Delete",
+                                      f"Are you sure you want to delete the product '{product_name}' with ID '{product_id}'?")
+        if not confirm:
+            return
+
         try:
             product_dbase.deleteRecord(product_id)
 
@@ -2599,6 +2605,12 @@ def supervisor_dashboard(username):
         product_id = row[0]
         product_name = row[1]
 
+        # Ask for confirmation
+        confirm = messagebox.askyesno("Confirm Delete",
+                                      f"Are you sure you want to delete the product '{product_name}' with ID '{product_id}'?")
+        if not confirm:
+            return
+
         try:
             product_dbase.deleteRecord(product_id)
 
@@ -2629,7 +2641,6 @@ def supervisor_dashboard(username):
 
         add_to_product_table()
         clear_product_entry_field()
-        fetch_product_to_list()
         update_to_be_packed_label()
         update_to_be_shipped_label()
         update_to_be_delivered_label()
@@ -4886,6 +4897,12 @@ def worker_dashboard(username):
         product_id = row[0]
         product_name = row[1]
 
+        # Ask for confirmation
+        confirm = messagebox.askyesno("Confirm Delete",
+                                      f"Are you sure you want to delete the product '{product_name}' with ID '{product_id}'?")
+        if not confirm:
+            return
+
         try:
             product_dbase.deleteRecord(product_id)
 
@@ -4916,7 +4933,6 @@ def worker_dashboard(username):
 
         add_to_product_table()
         clear_product_entry_field()
-        fetch_product_to_list()
         update_to_be_packed_label()
         update_to_be_shipped_label()
         update_to_be_delivered_label()
@@ -4924,8 +4940,6 @@ def worker_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
-        low_stock_vs_total_item_pie_chart()
-        bar_chart()
         return
 
     def search_product(event):
