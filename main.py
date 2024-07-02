@@ -1009,7 +1009,6 @@ def admin_dashboard(username):
 
         add_to_product_table()
         clear_product_entry_field()
-        fetch_product_to_list()
         update_to_be_packed_label()
         update_to_be_shipped_label()
         update_to_be_delivered_label()
@@ -1017,8 +1016,8 @@ def admin_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
-        low_stock_vs_total_item_pie_chart(canvas)
-        bar_chart(canvas1)
+        low_stock_vs_total_item_pie_chart()
+        bar_chart()
         return
 
     def edit_product_details():
@@ -2490,8 +2489,8 @@ def supervisor_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
-        low_stock_vs_total_item_pie_chart(canvas)
-        bar_chart(canvas1)
+        low_stock_vs_total_item_pie_chart()
+        bar_chart()
         return
 
     def edit_product_details():
@@ -4777,8 +4776,8 @@ def worker_dashboard(username):
         update_total_quantity_to_be_received_label()
         update_low_stock_item_label()
         update_total_items_label()
-        low_stock_vs_total_item_pie_chart(canvas)
-        bar_chart(canvas1)
+        low_stock_vs_total_item_pie_chart()
+        bar_chart()
         return
 
     def edit_product_details():
