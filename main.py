@@ -1106,7 +1106,6 @@ def admin_dashboard(username):
 
         add_to_product_table()
         clear_product_entry_field()
-        fetch_product_to_list()
         update_to_be_packed_label()
         update_to_be_shipped_label()
         update_to_be_delivered_label()
@@ -6325,7 +6324,7 @@ def worker_dashboard(username):
 # -----------------------------------------------
 
 #login_page()
-#admin_dashboard("admin")
-supervisor_dashboard("supervisor")
+admin_dashboard("admin")
+#supervisor_dashboard("supervisor")
 #worker_dashboard("worker1")
 app.mainloop()
