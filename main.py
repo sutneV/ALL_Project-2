@@ -1784,13 +1784,13 @@ def admin_dashboard(username):
 
     user_activities_menu_label = customtkinter.CTkLabel(
         master=user_activities_menu_frame,
-        text="Export to Excel Sheet",
+        text="Export User Activities",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
 
     export_user_activities_btn = customtkinter.CTkButton(
         master=user_activities_menu_frame,
-        text="Export Excel",
+        text="Export As Excel",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=lambda: export_to_excel(user_activities_tree),
         compound="top",
@@ -1801,7 +1801,7 @@ def admin_dashboard(username):
 
     export_user_activities_pdf_btn = customtkinter.CTkButton(
         master=user_activities_menu_frame,
-        text="Export PDF",
+        text="Export As PDF",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=lambda: export_to_pdf(user_activities_tree),
         compound="top",
@@ -1859,13 +1859,13 @@ def admin_dashboard(username):
 
     product_movement_menu_label = customtkinter.CTkLabel(
         master=product_movement_menu_frame,
-        text="Export to Excel Sheet",
+        text="Export Product Movement",
         font=customtkinter.CTkFont("SF Pro Display", weight="bold", size=20),
     )
 
     export_product_movement_btn = customtkinter.CTkButton(
         master=product_movement_menu_frame,
-        text="Export Excel",
+        text="Export As Excel",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=lambda: export_to_excel(product_movement_tree),
         compound="top",
@@ -1876,7 +1876,7 @@ def admin_dashboard(username):
 
     export_product_movement_pdf_btn = customtkinter.CTkButton(
         master=product_movement_menu_frame,
-        text="Export PDF",
+        text="Export As PDF",
         font=customtkinter.CTkFont("SF Pro Display"),
         command=lambda: export_to_pdf(product_movement_tree),
         compound="top",
@@ -6344,7 +6344,7 @@ def worker_dashboard(username):
 # -----------------------------------------------
 
 #login_page()
-admin_dashboard("admin")
+#admin_dashboard("admin")
 #supervisor_dashboard("supervisor")
-#worker_dashboard("worker1")
+worker_dashboard("worker1")
 app.mainloop()
